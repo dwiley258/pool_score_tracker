@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Leaderboard UI</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        
+        th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        tr.top-three {
+            background-color: #fff3cd;
+        }
+        
+        .test-section {
+            margin: 30px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        
+        h2 {
+            color: #2c3e50;
+        }
+        
+        button {
+            padding: 10px 20px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        
+        button:hover {
+            background-color: #2980b9;
+        }
+    </style>
+</head>
+<body>
+    <h1>Leaderboard UI Verification</h1>
+    
+    <div class="test-section">
+        <h2>Test 1: Empty State</h2>
+        <button onclick="testEmptyState()">Run Test</button>
+        <div id="test1-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Test 2: Basic Leaderboard</h2>
+        <button onclick="testBasicLeaderboard()">Run Test</button>
+        <div id="test2-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Test 3: Top 3 Highlighting</h2>
+        <button onclick="testTopThreeHighlighting()">Run Test</button>
+        <div id="test3-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Test 4: Correct Ordering</h2>
+        <button onclick="testOrdering()">Run Test</button>
+        <div id="test4-result"></div>
+    </div>
+
+    <script type="module">
+        import {
+            PlayerManager,
+            GameManager,
+            StatisticsCalculator,
+            Storage
+        } from './app.js';
+
+        // Mock localStorage
+        window.localStorage = {
+            getItem: () => null,
+            setItem: () => {},
+            removeItem: () => {},
+            clear: () => {}
+        };
+
+        // LeaderboardUI implementation for testing
+        const LeaderboardUI = {
+            render() {
+                const leaderboardContainer = document.getElementById('leaderboard-table');
+                
+                if (!leaderboardContainer) {
+                    return;
+                }
+
+                const players = PlayerManager.getAllPlayers();
+
+                if (players.length === 0) {
+                    leaderboardContainer.innerHTML = '<p style="color: #777; text-align: center; padding: 20px;">No players yet. Add players to see the leaderboard!</p>';
+                    return;
+                }
+
+                const leaderboard = StatisticsCalculator.generateLeaderboard(players);
+
+                let tableHTML = `
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Rank</th>
+                                <th>Player</th>
+                                <th>Games</th>
+                                <th>Wins</th>
+                                <th>Win %</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                leaderboard.forEach(entry => {
+                    const rowClass = entry.rank <= 3 ? 'top-three' : '';
+                    
+                    tableHTML += `
+                        <tr class="${rowClass}" data-player-id="${entry.player.id}">
+                            <td>${entry.rank}</td>
+                            <td>${this.escapeHtml(entry.player.name)}</td>
+                            <td>${entry.stats.gamesPlayed}</td>
+                            <td>${entry.stats.wins}</td>
+                            <td>${entry.stats.winPercentage}%</td>
+                        </tr>
+                    `;
+                });
+
+                tableHTML += `
+                        </tbody>
+                    </table>
+                `;
+
+                leaderboardContainer.innerHTML = tableHTML;
+            },
+
+            escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+        };
+
+        window.testEmptyState = function() {
+            PlayerManager.players = [];
+            GameManager.games = [];
+            
+            const container = document.getElementById('test1-result');
+            container.innerHTML = '<div id="leaderboard-table"></div>';
+            
+            LeaderboardUI.render();
+            
+            const result = document.getElementById('leaderboard-table').innerHTML;
+            if (result.includes('No players yet')) {
+                container.innerHTML += '<p style="color: green;">✓ PASS: Empty state renders correctly</p>';
+            } else {
+                container.innerHTML += '<p style="color: red;">✗ FAIL: Empty state not rendered</p>';
+            }
+        };
+
+        window.testBasicLeaderboard = function() {
+            PlayerManager.players = [];
+            GameManager.games = [];
+            
+            const p1 = PlayerManager.addPlayer('Alice');
+            const p2 = PlayerManager.addPlayer('Bob');
+            const p3 = PlayerManager.addPlayer('Charlie');
+            
+            GameManager.recordGame(p1.data.id, p2.data.id, 10, 5);
+            GameManager.recordGame(p2.data.id, p3.data.id, 8, 8);
+            
+            const container = document.getElementById('test2-result');
+            container.innerHTML = '<div id="leaderboard-table"></div>';
+            
+            LeaderboardUI.render();
+            
+            const result = document.getElementById('leaderboard-table').innerHTML;
+            const hasTable = result.includes('<table>');
+            const hasAlice = result.includes('Alice');
+            const hasBob = result.includes('Bob');
+            const hasCharlie = result.includes('Charlie');
+            
+            if (hasTable && hasAlice && hasBob && hasCharlie) {
+                container.innerHTML += '<p style="color: green;">✓ PASS: Leaderboard renders with all players</p>';
+            } else {
+                container.innerHTML += '<p style="color: red;">✗ FAIL: Leaderboard missing elements</p>';
+            }
+        };
+
+        window.testTopThreeHighlighting = function() {
+            PlayerManager.players = [];
+            GameManager.games = [];
+            
+            const players = [];
+            for (let i = 1; i <= 5; i++) {
+                players.push(PlayerManager.addPlayer(`Player${i}`));
+            }
+            
+            // Create different win rates
+            GameManager.recordGame(players[0].data.id, players[4].data.id, 10, 5);
+            GameManager.recordGame(players[0].data.id, players[4].data.id, 10, 5);
+            GameManager.recordGame(players[1].data.id, players[4].data.id, 10, 5);
+            GameManager.recordGame(players[2].data.id, players[4].data.id, 10, 5);
+            GameManager.recordGame(players[3].data.id, players[4].data.id, 10, 5);
+            
+            const container = document.getElementById('test3-result');
+            container.innerHTML = '<div id="leaderboard-table"></div>';
+            
+            LeaderboardUI.render();
+            
+            const topThreeRows = document.querySelectorAll('#test3-result tr.top-three');
+            
+            if (topThreeRows.length === 3) {
+                container.innerHTML += '<p style="color: green;">✓ PASS: Exactly 3 rows highlighted</p>';
+            } else {
+                container.innerHTML += `<p style="color: red;">✗ FAIL: Expected 3 highlighted rows, got ${topThreeRows.length}</p>`;
+            }
+        };
+
+        window.testOrdering = function() {
+            PlayerManager.players = [];
+            GameManager.games = [];
+            
+            const p1 = PlayerManager.addPlayer('Alice');
+            const p2 = PlayerManager.addPlayer('Bob');
+            const p3 = PlayerManager.addPlayer('Charlie');
+            
+            // Alice: 100% (2 wins, 2 games)
+            GameManager.recordGame(p1.data.id, p2.data.id, 10, 5);
+            GameManager.recordGame(p1.data.id, p3.data.id, 10, 5);
+            
+            // Bob: 50% (1 win, 2 games)
+            GameManager.recordGame(p2.data.id, p3.data.id, 10, 5);
+            
+            // Charlie: 0% (0 wins, 3 games)
+            
+            const container = document.getElementById('test4-result');
+            container.innerHTML = '<div id="leaderboard-table"></div>';
+            
+            LeaderboardUI.render();
+            
+            const rows = document.querySelectorAll('#test4-result tbody tr');
+            const firstPlayer = rows[0].textContent.includes('Alice');
+            const secondPlayer = rows[1].textContent.includes('Bob');
+            const thirdPlayer = rows[2].textContent.includes('Charlie');
+            
+            if (firstPlayer && secondPlayer && thirdPlayer) {
+                container.innerHTML += '<p style="color: green;">✓ PASS: Players ordered correctly by win percentage</p>';
+            } else {
+                container.innerHTML += '<p style="color: red;">✗ FAIL: Players not in correct order</p>';
+            }
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GameManager Tests</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+        .test-result {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+        }
+        .pass {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .fail {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .summary {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #e7f3ff;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>GameManager Component Tests</h1>
+    <div id="test-results"></div>
+    <div id="summary" class="summary"></div>
+
+    <script src="../app.js"></script>
+    <script>
+        // Simple test framework
+        const results = [];
+        
+        function resetState() {
+            localStorage.clear();
+            PlayerManager.players = [];
+            PlayerManager.initialize();
+            GameManager.games = [];
+            GameManager.initialize();
+        }
+        
+        function test(description, fn) {
+            resetState(); // Reset before each test
+            try {
+                fn();
+                results.push({ description, passed: true });
+                console.log('✓', description);
+            } catch (error) {
+                results.push({ description, passed: false, error: error.message });
+                console.error('✗', description, error);
+            }
+        }
+
+        function expect(actual) {
+            return {
+                toBe(expected) {
+                    if (actual !== expected) {
+                        throw new Error(`Expected ${expected} but got ${actual}`);
+                    }
+                },
+                toBeDefined() {
+                    if (actual === undefined) {
+                        throw new Error('Expected value to be defined');
+                    }
+                },
+                toBeNull() {
+                    if (actual !== null) {
+                        throw new Error(`Expected null but got ${actual}`);
+                    }
+                }
+            };
+        }
+
+        // Run tests
+        console.log('Starting GameManager tests...');
+
+        // Test: Record game between two different players
+        test('should record a game between two different players', () => {
+            const result1 = PlayerManager.addPlayer('Alice');
+            const result2 = PlayerManager.addPlayer('Bob');
+            
+            expect(result1.success).toBe(true);
+            expect(result2.success).toBe(true);
+            
+            const player1Id = result1.data.id;
+            const player2Id = result2.data.id;
+            
+            const gameResult = GameManager.recordGame(player1Id, player2Id, 10, 5);
+            
+            expect(gameResult.success).toBe(true);
+            expect(gameResult.data).toBeDefined();
+            expect(gameResult.data.player1Id).toBe(player1Id);
+            expect(gameResult.data.player2Id).toBe(player2Id);
+            expect(gameResult.data.player1Score).toBe(10);
+            expect(gameResult.data.player2Score).toBe(5);
+            expect(gameResult.data.winnerId).toBe(player1Id);
+        });
+
+        // Test: Reject game between same player
+        test('should reject game between same player', () => {
+            const result = PlayerManager.addPlayer('Alice');
+            const playerId = result.data.id;
+            
+            const gameResult = GameManager.recordGame(playerId, playerId, 10, 5);
+            
+            expect(gameResult.success).toBe(false);
+            expect(gameResult.error).toBe('Cannot record game between same player');
+        });
+
+        // Test: Reject negative scores
+        test('should reject negative scores', () => {
+            const result1 = PlayerManager.addPlayer('Alice');
+            const result2 = PlayerManager.addPlayer('Bob');
+            
+            const gameResult = GameManager.recordGame(result1.data.id, result2.data.id, -5, 10);
+            
+            expect(gameResult.success).toBe(false);
+            expect(gameResult.error).toBe('Scores must be non-negative integers');
+        });
+
+        // Test: Handle tie games
+        test('should handle tie games correctly', () => {
+            const result1 = PlayerManager.addPlayer('Alice');
+            const result2 = PlayerManager.addPlayer('Bob');
+            
+            const gameResult = GameManager.recordGame(result1.data.id, result2.data.id, 10, 10);
+            
+            expect(gameResult.success).toBe(true);
+            expect(gameResult.data.winnerId).toBeNull();
+        });
+
+        // Test: Update player statistics
+        test('should update player statistics', () => {
+            const result1 = PlayerManager.addPlayer('Alice');
+            const result2 = PlayerManager.addPlayer('Bob');
+            
+            const player1 = PlayerManager.getPlayer(result1.data.id);
+            const player2 = PlayerManager.getPlayer(result2.data.id);
+            
+            expect(player1.gamesPlayed).toBe(0);
+            expect(player1.wins).toBe(0);
+            
+            GameManager.recordGame(result1.data.id, result2.data.id, 10, 5);
+            
+            expect(player1.gamesPlayed).toBe(1);
+            expect(player1.wins).toBe(1);
+            expect(player2.gamesPlayed).toBe(1);
+            expect(player2.wins).toBe(0);
+        });
+
+        // Test: Delete game
+        test('should delete a game by ID', () => {
+            const result1 = PlayerManager.addPlayer('Alice');
+            const result2 = PlayerManager.addPlayer('Bob');
+            
+            const gameResult = GameManager.recordGame(result1.data.id, result2.data.id, 10, 5);
+            const gameId = gameResult.data.id;
+            
+            expect(GameManager.games.length).toBe(1);
+            
+            const deleteResult = GameManager.deleteGame(gameId);
+            
+            expect(deleteResult.success).toBe(true);
+            expect(GameManager.games.length).toBe(0);
+        });
+
+        // Test: Update stats on delete
+        test('should update player statistics when deleting game', () => {
+            const result1 = PlayerManager.addPlayer('Alice');
+            const result2 = PlayerManager.addPlayer('Bob');
+            
+            const gameResult = GameManager.recordGame(result1.data.id, result2.data.id, 10, 5);
+            
+            const player1 = PlayerManager.getPlayer(result1.data.id);
+            expect(player1.gamesPlayed).toBe(1);
+            expect(player1.wins).toBe(1);
+            
+            GameManager.deleteGame(gameResult.data.id);
+            
+            expect(player1.gamesPlayed).toBe(0);
+            expect(player1.wins).toBe(0);
+        });
+
+        // Test: Get game history
+        test('should return games in reverse chronological order', () => {
+            const result1 = PlayerManager.addPlayer('Alice');
+            const result2 = PlayerManager.addPlayer('Bob');
+            
+            const game1 = GameManager.recordGame(result1.data.id, result2.data.id, 10, 5);
+            
+            // Manually adjust timestamps to ensure different times
+            GameManager.games[0].timestamp = new Date(Date.now() - 3000).toISOString();
+            
+            const game2 = GameManager.recordGame(result1.data.id, result2.data.id, 8, 12);
+            GameManager.games[1].timestamp = new Date(Date.now() - 2000).toISOString();
+            
+            const game3 = GameManager.recordGame(result1.data.id, result2.data.id, 15, 10);
+            GameManager.games[2].timestamp = new Date(Date.now() - 1000).toISOString();
+            
+            const history = GameManager.getGameHistory();
+            
+            expect(history.length).toBe(3);
+            // Most recent should be first (game3 has the most recent timestamp)
+            expect(history[0].id).toBe(game3.data.id);
+            expect(history[1].id).toBe(game2.data.id);
+            expect(history[2].id).toBe(game1.data.id);
+        });
+
+        // Test: Filter by player
+        test('should filter games by player ID', () => {
+            const result1 = PlayerManager.addPlayer('Alice');
+            const result2 = PlayerManager.addPlayer('Bob');
+            const result3 = PlayerManager.addPlayer('Charlie');
+            
+            GameManager.recordGame(result1.data.id, result2.data.id, 10, 5);
+            GameManager.recordGame(result1.data.id, result3.data.id, 8, 12);
+            GameManager.recordGame(result2.data.id, result3.data.id, 15, 10);
+            
+            const aliceGames = GameManager.getGameHistory(result1.data.id);
+            
+            expect(aliceGames.length).toBe(2);
+        });
+
+        // Display results
+        const resultsDiv = document.getElementById('test-results');
+        const summaryDiv = document.getElementById('summary');
+        
+        let passed = 0;
+        let failed = 0;
+        
+        results.forEach(result => {
+            const div = document.createElement('div');
+            div.className = `test-result ${result.passed ? 'pass' : 'fail'}`;
+            div.textContent = `${result.passed ? '✓' : '✗'} ${result.description}`;
+            if (!result.passed) {
+                div.textContent += ` - ${result.error}`;
+            }
+            resultsDiv.appendChild(div);
+            
+            if (result.passed) passed++;
+            else failed++;
+        });
+        
+        summaryDiv.innerHTML = `
+            <strong>Test Summary:</strong><br>
+            Total: ${results.length}<br>
+            Passed: ${passed}<br>
+            Failed: ${failed}
+        `;
+        
+        console.log(`\nTest Summary: ${passed}/${results.length} passed`);
+    </script>
+</body>
+</html>

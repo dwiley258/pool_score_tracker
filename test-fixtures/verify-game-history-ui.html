@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Game History UI</title>
+    <link rel="stylesheet" href="../styles.css">
+    <style>
+        .test-section {
+            margin: 20px;
+            padding: 20px;
+            border: 2px solid #3498db;
+            border-radius: 8px;
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .test-pass {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .test-fail {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Game History UI Verification</h1>
+        </header>
+
+        <div class="test-section">
+            <h2>Test Results</h2>
+            <div id="test-results"></div>
+        </div>
+
+        <main>
+            <!-- Game History Section -->
+            <section id="game-history" class="card">
+                <h2>Game History</h2>
+                <div class="filter-container">
+                    <label for="player-filter">Filter by player:</label>
+                    <select id="player-filter">
+                        <option value="">All Players</option>
+                    </select>
+                </div>
+                <div id="game-list"></div>
+            </section>
+        </main>
+    </div>
+
+    <script type="module">
+        import { 
+            PlayerManager, 
+            GameManager, 
+            GameHistoryUI 
+        } from './app.js';
+
+        // Test results container
+        const resultsContainer = document.getElementById('test-results');
+
+        function addTestResult(testName, passed, message = '') {
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `test-result ${passed ? 'test-pass' : 'test-fail'}`;
+            resultDiv.textContent = `${passed ? '✓' : '✗'} ${testName}${message ? ': ' + message : ''}`;
+            resultsContainer.appendChild(resultDiv);
+        }
+
+        // Initialize managers
+        PlayerManager.players = [];
+        GameManager.games = [];
+
+        // Test 1: GameHistoryUI exists
+        addTestResult('GameHistoryUI component exists', typeof GameHistoryUI !== 'undefined');
+
+        // Test 2: GameHistoryUI has required methods
+        const hasInitialize = typeof GameHistoryUI.initialize === 'function';
+        const hasRender = typeof GameHistoryUI.render === 'function';
+        const hasFormatTimestamp = typeof GameHistoryUI.formatTimestamp === 'function';
+        addTestResult('GameHistoryUI has initialize method', hasInitialize);
+        addTestResult('GameHistoryUI has render method', hasRender);
+        addTestResult('GameHistoryUI has formatTimestamp method', hasFormatTimestamp);
+
+        // Test 3: Add test players
+        const player1Result = PlayerManager.addPlayer('Alice');
+        const player2Result = PlayerManager.addPlayer('Bob');
+        const player3Result = PlayerManager.addPlayer('Charlie');
+        addTestResult('Added test players', player1Result.success && player2Result.success && player3Result.success);
+
+        // Test 4: Record test games
+        const game1 = GameManager.recordGame(player1Result.data.id, player2Result.data.id, 10, 5);
+        const game2 = GameManager.recordGame(player2Result.data.id, player3Result.data.id, 8, 8);
+        const game3 = GameManager.recordGame(player1Result.data.id, player3Result.data.id, 3, 7);
+        addTestResult('Recorded test games', game1.success && game2.success && game3.success);
+
+        // Test 5: Initialize GameHistoryUI
+        try {
+            GameHistoryUI.initialize();
+            addTestResult('GameHistoryUI initialized successfully', true);
+        } catch (error) {
+            addTestResult('GameHistoryUI initialized successfully', false, error.message);
+        }
+
+        // Test 6: Check if game list is rendered
+        setTimeout(() => {
+            const gameList = document.getElementById('game-list');
+            const gameItems = gameList.querySelectorAll('.game-item');
+            addTestResult('Game list rendered', gameItems.length === 3, `Found ${gameItems.length} games`);
+
+            // Test 7: Check if games are in reverse chronological order
+            const timestamps = Array.from(gameItems).map(item => {
+                const gameId = item.getAttribute('data-game-id');
+                const game = GameManager.getGameById(gameId);
+                return new Date(game.timestamp).getTime();
+            });
+            const isReverseChrono = timestamps.every((time, i) => 
+                i === 0 || time <= timestamps[i - 1]
+            );
+            addTestResult('Games in reverse chronological order', isReverseChrono);
+
+            // Test 8: Check if player filter is populated
+            const playerFilter = document.getElementById('player-filter');
+            const options = playerFilter.querySelectorAll('option');
+            addTestResult('Player filter populated', options.length === 4, `Found ${options.length} options (including "All Players")`);
+
+            // Test 9: Test filtering by player
+            playerFilter.value = player1Result.data.id;
+            playerFilter.dispatchEvent(new Event('change'));
+            
+            setTimeout(() => {
+                const filteredGameItems = gameList.querySelectorAll('.game-item');
+                addTestResult('Player filter works', filteredGameItems.length === 2, `Found ${filteredGameItems.length} games for Alice`);
+
+                // Test 10: Check if delete buttons exist
+                const deleteButtons = gameList.querySelectorAll('.delete-game-btn');
+                addTestResult('Delete buttons rendered', deleteButtons.length === filteredGameItems.length);
+
+                // Test 11: Test timestamp formatting
+                const testTimestamp = '2024-01-15T15:45:00.000Z';
+                const formatted = GameHistoryUI.formatTimestamp(testTimestamp);
+                addTestResult('Timestamp formatting works', formatted.includes('2024') && formatted.includes('at'));
+
+                // Test 12: Check if winner is highlighted
+                const gameResultElements = gameList.querySelectorAll('.game-result');
+                const hasWinnerClass = Array.from(gameResultElements).some(el => 
+                    el.innerHTML.includes('class="player-name winner"')
+                );
+                addTestResult('Winner highlighting present', hasWinnerClass);
+
+                console.log('All tests completed!');
+            }, 100);
+        }, 100);
+    </script>
+</body>
+</html>

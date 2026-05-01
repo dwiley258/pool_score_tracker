@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify GameRecordingUI</title>
+    <link rel="stylesheet" href="../styles.css">
+    <style>
+        .test-info {
+            background: #e3f2fd;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+            border-left: 4px solid #2196f3;
+        }
+        .test-info h3 {
+            margin-top: 0;
+            color: #1976d2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>GameRecordingUI Verification</h1>
+        </header>
+
+        <main>
+            <section class="card">
+                <div class="test-info">
+                    <h3>Test Instructions</h3>
+                    <ol>
+                        <li>Add at least 2 players below</li>
+                        <li>The game recording form should become enabled</li>
+                        <li>Select two different players and enter scores</li>
+                        <li>Click "Record Game" to test the functionality</li>
+                        <li>Verify success/error messages appear</li>
+                    </ol>
+                </div>
+            </section>
+
+            <!-- Player Management Section -->
+            <section id="player-management" class="card">
+                <h2>Player Management</h2>
+                <div id="player-form-container">
+                    <form id="add-player-form">
+                        <input type="text" id="player-name-input" placeholder="Enter player name" required>
+                        <button type="submit">Add Player</button>
+                    </form>
+                    <div id="player-count"></div>
+                </div>
+                <div id="player-list"></div>
+                <div id="player-feedback" class="feedback"></div>
+            </section>
+
+            <!-- Game Recording Section -->
+            <section id="game-recording" class="card">
+                <h2>Record Game</h2>
+                <form id="record-game-form">
+                    <div class="form-group">
+                        <label for="player1-select">Player 1:</label>
+                        <select id="player1-select" required>
+                            <option value="">Select Player 1</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="player1-score">Score:</label>
+                        <input type="number" id="player1-score" min="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="player2-select">Player 2:</label>
+                        <select id="player2-select" required>
+                            <option value="">Select Player 2</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="player2-score">Score:</label>
+                        <input type="number" id="player2-score" min="0" required>
+                    </div>
+                    <button type="submit">Record Game</button>
+                </form>
+                <div id="game-feedback" class="feedback"></div>
+            </section>
+
+            <!-- Debug Info -->
+            <section class="card">
+                <h2>Debug Info</h2>
+                <div id="debug-info" style="font-family: monospace; white-space: pre-wrap;"></div>
+            </section>
+        </main>
+    </div>
+
+    <script type="module">
+        import { 
+            PlayerManager, 
+            GameManager, 
+            Storage,
+            PlayerManagementUI,
+            GameRecordingUI 
+        } from './app.js';
+
+        // Clear storage for fresh start
+        Storage.clear();
+
+        // Initialize managers
+        PlayerManager.initialize();
+        GameManager.initialize();
+
+        // Initialize UI components
+        PlayerManagementUI.initialize();
+        GameRecordingUI.initialize();
+
+        // Debug info updater
+        function updateDebugInfo() {
+            const debugDiv = document.getElementById('debug-info');
+            const players = PlayerManager.getAllPlayers();
+            const games = GameManager.getGameHistory();
+            
+            debugDiv.textContent = `Players: ${players.length}\n`;
+            players.forEach(p => {
+                debugDiv.textContent += `  - ${p.name} (ID: ${p.id.substring(0, 8)}..., Games: ${p.gamesPlayed}, Wins: ${p.wins})\n`;
+            });
+            
+            debugDiv.textContent += `\nGames: ${games.length}\n`;
+            games.forEach((g, i) => {
+                const p1 = PlayerManager.getPlayer(g.player1Id);
+                const p2 = PlayerManager.getPlayer(g.player2Id);
+                const winner = g.winnerId ? PlayerManager.getPlayer(g.winnerId) : null;
+                debugDiv.textContent += `  ${i + 1}. ${p1?.name} (${g.player1Score}) vs ${p2?.name} (${g.player2Score})`;
+                if (winner) {
+                    debugDiv.textContent += ` - Winner: ${winner.name}\n`;
+                } else {
+                    debugDiv.textContent += ` - Tie\n`;
+                }
+            });
+        }
+
+        // Update debug info periodically
+        setInterval(updateDebugInfo, 500);
+        updateDebugInfo();
+
+        console.log('GameRecordingUI verification page loaded');
+        console.log('GameRecordingUI:', GameRecordingUI);
+    </script>
+</body>
+</html>

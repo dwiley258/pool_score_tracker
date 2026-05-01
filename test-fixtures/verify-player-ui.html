@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PlayerManagementUI Verification</title>
+    <link rel="stylesheet" href="../styles.css">
+    <style>
+        .verification-panel {
+            background-color: #f0f8ff;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            border: 2px solid #4CAF50;
+        }
+        .verification-panel h3 {
+            color: #2c3e50;
+            margin-top: 0;
+        }
+        .test-step {
+            padding: 10px;
+            margin: 10px 0;
+            background-color: white;
+            border-left: 4px solid #3498db;
+        }
+        .test-step.completed {
+            border-left-color: #4CAF50;
+            background-color: #e8f5e9;
+        }
+        .auto-test-results {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #fff;
+            border-radius: 4px;
+        }
+        .test-result {
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 4px;
+        }
+        .test-result.pass {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .test-result.fail {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="verification-panel">
+            <h3>🔍 PlayerManagementUI Verification</h3>
+            <p>This page verifies all requirements for Task 7.1:</p>
+            <div class="test-step">1. Player list rendering with count display (X/20)</div>
+            <div class="test-step">2. Add player form with validation feedback</div>
+            <div class="test-step">3. Remove player buttons with confirmation</div>
+            <div class="test-step">4. Wire up to PlayerManager</div>
+            <div class="test-step">5. Disable add button at 20 player limit</div>
+            
+            <button id="run-auto-tests" style="margin-top: 15px;">Run Automated Tests</button>
+            <div id="auto-test-results" class="auto-test-results" style="display: none;"></div>
+        </div>
+
+        <section id="player-management" class="card">
+            <h2>Player Management</h2>
+            <div id="player-form-container">
+                <form id="add-player-form">
+                    <input type="text" id="player-name-input" placeholder="Enter player name" required>
+                    <button type="submit">Add Player</button>
+                </form>
+                <div id="player-count"></div>
+            </div>
+            <div id="player-list"></div>
+            <div id="player-feedback" class="feedback"></div>
+        </section>
+    </div>
+
+    <script type="module">
+        import { PlayerManager, PlayerManagementUI, Storage } from './app.js';
+
+        // Clear storage for clean test
+        Storage.clear();
+        
+        // Initialize
+        PlayerManager.initialize();
+        PlayerManagementUI.initialize();
+
+        console.log('PlayerManagementUI verification page loaded');
+
+        // Automated tests
+        document.getElementById('run-auto-tests').addEventListener('click', () => {
+            const resultsDiv = document.getElementById('auto-test-results');
+            resultsDiv.style.display = 'block';
+            resultsDiv.innerHTML = '<h4>Running Tests...</h4>';
+            
+            const results = [];
+            
+            // Test 1: Initial render shows 0/20
+            const countText = document.getElementById('player-count').textContent;
+            results.push({
+                name: 'Initial player count displays 0/20',
+                pass: countText === 'Players: 0/20'
+            });
+            
+            // Test 2: Add a player
+            const input = document.getElementById('player-name-input');
+            input.value = 'Test Player';
+            PlayerManagementUI.handleAddPlayer();
+            
+            results.push({
+                name: 'Player can be added',
+                pass: PlayerManager.players.length === 1
+            });
+            
+            results.push({
+                name: 'Player count updates to 1/20',
+                pass: document.getElementById('player-count').textContent === 'Players: 1/20'
+            });
+            
+            results.push({
+                name: 'Player appears in list',
+                pass: document.getElementById('player-list').innerHTML.includes('Test Player')
+            });
+            
+            results.push({
+                name: 'Success feedback is shown',
+                pass: document.getElementById('player-feedback').className.includes('success')
+            });
+            
+            // Test 3: Try to add duplicate
+            input.value = 'test player'; // Case-insensitive
+            PlayerManagementUI.handleAddPlayer();
+            
+            results.push({
+                name: 'Duplicate player is rejected',
+                pass: PlayerManager.players.length === 1
+            });
+            
+            results.push({
+                name: 'Error feedback is shown for duplicate',
+                pass: document.getElementById('player-feedback').className.includes('error')
+            });
+            
+            // Test 4: Add more players
+            input.value = 'Alice';
+            PlayerManagementUI.handleAddPlayer();
+            input.value = 'Bob';
+            PlayerManagementUI.handleAddPlayer();
+            
+            results.push({
+                name: 'Multiple players can be added',
+                pass: PlayerManager.players.length === 3
+            });
+            
+            results.push({
+                name: 'Players are sorted alphabetically',
+                pass: document.querySelectorAll('.player-name')[0].textContent === 'Alice'
+            });
+            
+            // Test 5: Remove buttons exist
+            const removeButtons = document.querySelectorAll('.remove-player-btn');
+            results.push({
+                name: 'Remove buttons are rendered',
+                pass: removeButtons.length === 3
+            });
+            
+            // Test 6: Test 20 player limit
+            Storage.clear();
+            PlayerManager.players = [];
+            for (let i = 1; i <= 20; i++) {
+                PlayerManager.addPlayer(`Player${i}`);
+            }
+            PlayerManagementUI.render();
+            
+            const submitButton = document.querySelector('#add-player-form button[type="submit"]');
+            results.push({
+                name: 'Add button is disabled at 20 players',
+                pass: submitButton.disabled === true
+            });
+            
+            results.push({
+                name: 'Player count shows 20/20',
+                pass: document.getElementById('player-count').textContent === 'Players: 20/20'
+            });
+            
+            // Test 7: XSS protection
+            Storage.clear();
+            PlayerManager.players = [];
+            PlayerManager.addPlayer('<script>alert("xss")</script>');
+            PlayerManagementUI.render();
+            
+            const playerListHTML = document.getElementById('player-list').innerHTML;
+            const playerNameElement = document.querySelector('.player-name');
+            const playerNameText = playerNameElement ? playerNameElement.textContent : '';
+            
+            // The key test: the text content should show the literal string, not execute as HTML
+            const textIsLiteral = playerNameText === '<script>alert("xss")</script>';
+            
+            // The innerHTML should contain escaped entities (browser serialization)
+            const hasScriptTag = playerListHTML.includes('<script>alert');
+            const hasEscapedScript = playerListHTML.includes('&lt;script&gt;') || 
+                                     playerListHTML.includes('&lt;script') ||
+                                     textIsLiteral; // If text is literal, escaping worked
+            
+            console.log('XSS Test Debug:');
+            console.log('Player list HTML:', playerListHTML);
+            console.log('Player name text:', playerNameText);
+            console.log('Text is literal:', textIsLiteral);
+            console.log('Contains <script> tag:', hasScriptTag);
+            console.log('Has escaped content:', hasEscapedScript);
+            
+            results.push({
+                name: 'HTML is escaped in player names',
+                pass: textIsLiteral && !hasScriptTag,
+                debug: `Text literal: ${textIsLiteral}, Has <script>: ${hasScriptTag}`
+            });
+            
+            // Display results
+            let html = '<h4>Test Results:</h4>';
+            let passCount = 0;
+            let failCount = 0;
+            
+            results.forEach(result => {
+                if (result.pass) {
+                    passCount++;
+                    html += `<div class="test-result pass">✓ ${result.name}</div>`;
+                } else {
+                    failCount++;
+                    html += `<div class="test-result fail">✗ ${result.name}${result.debug ? ' - ' + result.debug : ''}</div>`;
+                }
+            });
+            
+            html += `<h4 style="margin-top: 15px; color: ${failCount === 0 ? 'green' : 'red'}">
+                Summary: ${passCount} passed, ${failCount} failed
+            </h4>`;
+            
+            resultsDiv.innerHTML = html;
+            
+            // Reset for manual testing
+            Storage.clear();
+            PlayerManager.players = [];
+            PlayerManagementUI.render();
+        });
+    </script>
+</body>
+</html>

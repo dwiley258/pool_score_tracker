@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pool Score Tracker</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Pool Score Tracker</h1>
+        </header>
+
+        <main>
+            <!-- Player Management Section -->
+            <section id="player-management" class="card">
+                <h2>Player Management</h2>
+                <div id="player-form-container">
+                    <form id="add-player-form">
+                        <input type="text" id="player-name-input" placeholder="Enter player name" required>
+                        <button type="submit">Add Player</button>
+                    </form>
+                    <div id="player-count"></div>
+                </div>
+                <div id="player-list"></div>
+                <div id="player-feedback" class="feedback"></div>
+            </section>
+
+            <!-- Game Recording Section -->
+            <section id="game-recording" class="card">
+                <h2>Record Game</h2>
+                <form id="record-game-form">
+                    <div class="form-group">
+                        <label for="player1-select">Player 1:</label>
+                        <select id="player1-select" required>
+                            <option value="">Select Player 1</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="player1-score">Score:</label>
+                        <input type="number" id="player1-score" min="0" value="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="player2-select">Player 2:</label>
+                        <select id="player2-select" required>
+                            <option value="">Select Player 2</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="player2-score">Score:</label>
+                        <input type="number" id="player2-score" min="0" value="0" required>
+                    </div>
+                    <button type="submit">Record Game</button>
+                </form>
+                <div id="game-feedback" class="feedback"></div>
+            </section>
+
+            <!-- Game History Section -->
+            <section id="game-history" class="card">
+                <h2>Game History</h2>
+                <div class="filter-container">
+                    <label for="player-filter">Filter by player:</label>
+                    <select id="player-filter">
+                        <option value="">All Players</option>
+                    </select>
+                </div>
+                <div id="game-list"></div>
+            </section>
+
+            <!-- Leaderboard Section -->
+            <section id="leaderboard" class="card">
+                <h2>Leaderboard</h2>
+                <div id="leaderboard-table"></div>
+            </section>
+        </main>
+    </div>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>

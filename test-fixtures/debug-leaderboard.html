@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Debug Leaderboard Test</title>
+</head>
+<body>
+    <h1>Debug Leaderboard Test</h1>
+    <pre id="output"></pre>
+
+    <script src="../app.js"></script>
+    <script>
+        const output = document.getElementById('output');
+        let log = '';
+
+        function logLine(text) {
+            log += text + '\n';
+            output.textContent = log;
+        }
+
+        // Clear and reset
+        localStorage.clear();
+        PlayerManager.players = [];
+        GameManager.games = [];
+        
+        const alice = PlayerManager.addPlayer('Alice').data;
+        const bob = PlayerManager.addPlayer('Bob').data;
+        const charlie = PlayerManager.addPlayer('Charlie').data;
+        
+        logLine('=== Recording Games ===');
+        
+        // Alice: 3/4 = 75%
+        logLine('\nAlice vs Bob games:');
+        GameManager.recordGame(alice.id, bob.id, 10, 5);
+        logLine('  Game 1: Alice 10, Bob 5 -> Winner: Alice');
+        GameManager.recordGame(alice.id, bob.id, 10, 5);
+        logLine('  Game 2: Alice 10, Bob 5 -> Winner: Alice');
+        GameManager.recordGame(alice.id, bob.id, 10, 5);
+        logLine('  Game 3: Alice 10, Bob 5 -> Winner: Alice');
+        GameManager.recordGame(alice.id, bob.id, 5, 10);
+        logLine('  Game 4: Alice 5, Bob 10 -> Winner: Bob');
+        
+        // Bob: 1/5 = 20%
+        logLine('\nBob vs Charlie games:');
+        GameManager.recordGame(bob.id, charlie.id, 10, 5);
+        logLine('  Game 5: Bob 10, Charlie 5 -> Winner: Bob');
+        
+        // Charlie: 4/5 = 80%
+        logLine('\nCharlie vs Alice games:');
+        GameManager.recordGame(charlie.id, alice.id, 10, 5);
+        logLine('  Game 6: Charlie 10, Alice 5 -> Winner: Charlie');
+        GameManager.recordGame(charlie.id, alice.id, 10, 5);
+        logLine('  Game 7: Charlie 10, Alice 5 -> Winner: Charlie');
+        GameManager.recordGame(charlie.id, alice.id, 10, 5);
+        logLine('  Game 8: Charlie 10, Alice 5 -> Winner: Charlie');
+        GameManager.recordGame(charlie.id, alice.id, 10, 5);
+        logLine('  Game 9: Charlie 10, Alice 5 -> Winner: Charlie');
+        
+        logLine('\n=== Calculating Stats ===');
+        const aliceStats = StatisticsCalculator.calculatePlayerStats(alice.id, GameManager.games);
+        const bobStats = StatisticsCalculator.calculatePlayerStats(bob.id, GameManager.games);
+        const charlieStats = StatisticsCalculator.calculatePlayerStats(charlie.id, GameManager.games);
+        
+        logLine(`\nAlice: ${aliceStats.gamesPlayed} games, ${aliceStats.wins} wins, ${aliceStats.winPercentage}%`);
+        logLine(`Bob: ${bobStats.gamesPlayed} games, ${bobStats.wins} wins, ${bobStats.winPercentage}%`);
+        logLine(`Charlie: ${charlieStats.gamesPlayed} games, ${charlieStats.wins} wins, ${charlieStats.winPercentage}%`);
+        
+        logLine('\n=== Generating Leaderboard ===');
+        const leaderboard = StatisticsCalculator.generateLeaderboard(PlayerManager.players);
+        
+        leaderboard.forEach((entry, index) => {
+            logLine(`${entry.rank}. ${entry.player.name}: ${entry.stats.winPercentage}% (${entry.stats.wins} wins, ${entry.stats.gamesPlayed} games)`);
+        });
+        
+        logLine('\n=== Expected Order ===');
+        logLine('1. Charlie (80%)');
+        logLine('2. Bob (40%)');
+        logLine('3. Alice (37.5%)');
+    </script>
+</body>
+</html>

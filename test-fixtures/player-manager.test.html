@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PlayerManager Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+        .test-result {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .pass {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .fail {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        h2 {
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+    <h1>PlayerManager Unit Tests</h1>
+    <div id="test-results"></div>
+
+    <script src="../app.js"></script>
+    <script>
+        // Test runner
+        const results = [];
+
+        function test(description, testFn) {
+            try {
+                testFn();
+                results.push({ description, passed: true });
+            } catch (error) {
+                results.push({ description, passed: false, error: error.message });
+            }
+        }
+
+        function assert(condition, message) {
+            if (!condition) {
+                throw new Error(message || 'Assertion failed');
+            }
+        }
+
+        function assertEquals(actual, expected, message) {
+            if (actual !== expected) {
+                throw new Error(message || `Expected ${expected} but got ${actual}`);
+            }
+        }
+
+        // Clear storage before tests
+        localStorage.clear();
+        PlayerManager.players = [];
+
+        // Test Suite
+        console.log('Running PlayerManager tests...');
+
+        // Test 1: Add player with unique name
+        test('Should add a player with a unique name', () => {
+            const result = PlayerManager.addPlayer('Alice');
+            assert(result.success, 'addPlayer should return success');
+            assert(result.data, 'addPlayer should return player data');
+            assertEquals(result.data.name, 'Alice', 'Player name should be Alice');
+            assertEquals(PlayerManager.players.length, 1, 'Should have 1 player');
+        });
+
+        // Test 2: Reject duplicate names (case-insensitive)
+        test('Should reject duplicate player names (case-insensitive)', () => {
+            PlayerManager.players = [];
+            PlayerManager.addPlayer('Bob');
+            const result = PlayerManager.addPlayer('bob');
+            assert(!result.success, 'Should fail to add duplicate name');
+            assertEquals(result.error, 'Player name already exists', 'Should return correct error');
+            assertEquals(PlayerManager.players.length, 1, 'Should still have only 1 player');
+        });
+
+        // Test 3: Reject empty names
+        test('Should reject empty player names', () => {
+            PlayerManager.players = [];
+            const result = PlayerManager.addPlayer('');
+            assert(!result.success, 'Should fail to add empty name');
+            assertEquals(PlayerManager.players.length, 0, 'Should have 0 players');
+        });
+
+        // Test 4: Check 20 player limit
+        test('Should enforce 20 player limit', () => {
+            PlayerManager.players = [];
+            // Add 20 players
+            for (let i = 1; i <= 20; i++) {
+                PlayerManager.addPlayer(`Player${i}`);
+            }
+            assertEquals(PlayerManager.players.length, 20, 'Should have 20 players');
+            assert(!PlayerManager.canAddPlayer(), 'canAddPlayer should return false');
+            
+            const result = PlayerManager.addPlayer('Player21');
+            assert(!result.success, 'Should fail to add 21st player');
+            assertEquals(result.error, 'Cannot add more than 20 players', 'Should return correct error');
+        });
+
+        // Test 5: Remove player by ID
+        test('Should remove a player by ID', () => {
+            PlayerManager.players = [];
+            const addResult = PlayerManager.addPlayer('Charlie');
+            const playerId = addResult.data.id;
+            
+            const removeResult = PlayerManager.removePlayer(playerId);
+            assert(removeResult.success, 'removePlayer should return success');
+            assertEquals(PlayerManager.players.length, 0, 'Should have 0 players after removal');
+        });
+
+        // Test 6: Return error for non-existent player removal
+        test('Should return error for non-existent player', () => {
+            PlayerManager.players = [];
+            const result = PlayerManager.removePlayer('non-existent-id');
+            assert(!result.success, 'Should fail to remove non-existent player');
+            assertEquals(result.error, 'Player does not exist', 'Should return correct error');
+        });
+
+        // Test 7: Get player by ID
+        test('Should return player by ID', () => {
+            PlayerManager.players = [];
+            const addResult = PlayerManager.addPlayer('David');
+            const playerId = addResult.data.id;
+            
+            const player = PlayerManager.getPlayer(playerId);
+            assert(player !== null, 'Should return a player');
+            assertEquals(player.name, 'David', 'Should return correct player');
+        });
+
+        // Test 8: Return null for non-existent player
+        test('Should return null for non-existent player', () => {
+            const player = PlayerManager.getPlayer('non-existent-id');
+            assertEquals(player, null, 'Should return null');
+        });
+
+        // Test 9: Get all players
+        test('Should return all players', () => {
+            PlayerManager.players = [];
+            PlayerManager.addPlayer('Eve');
+            PlayerManager.addPlayer('Frank');
+            
+            const allPlayers = PlayerManager.getAllPlayers();
+            assertEquals(allPlayers.length, 2, 'Should return 2 players');
+        });
+
+        // Test 10: getAllPlayers returns a copy
+        test('Should return a copy of players array', () => {
+            PlayerManager.players = [];
+            PlayerManager.addPlayer('Grace');
+            
+            const allPlayers = PlayerManager.getAllPlayers();
+            allPlayers.push({ id: 'fake', name: 'Fake' });
+            
+            assertEquals(PlayerManager.players.length, 1, 'Original array should not be modified');
+        });
+
+        // Display results
+        const resultsDiv = document.getElementById('test-results');
+        let passCount = 0;
+        let failCount = 0;
+
+        results.forEach(result => {
+            const div = document.createElement('div');
+            div.className = `test-result ${result.passed ? 'pass' : 'fail'}`;
+            div.textContent = `${result.passed ? '✓' : '✗'} ${result.description}`;
+            if (!result.passed) {
+                div.textContent += ` - ${result.error}`;
+                failCount++;
+            } else {
+                passCount++;
+            }
+            resultsDiv.appendChild(div);
+        });
+
+        // Summary
+        const summary = document.createElement('h2');
+        summary.textContent = `Results: ${passCount} passed, ${failCount} failed`;
+        summary.style.color = failCount === 0 ? 'green' : 'red';
+        resultsDiv.insertBefore(summary, resultsDiv.firstChild);
+
+        console.log(`Tests complete: ${passCount} passed, ${failCount} failed`);
+    </script>
+</body>
+</html>

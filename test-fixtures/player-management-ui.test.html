@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PlayerManagementUI Test</title>
+    <link rel="stylesheet" href="../styles.css">
+    <style>
+        body {
+            padding: 20px;
+        }
+        .test-info {
+            background-color: #e7f3ff;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+            border: 1px solid #b3d9ff;
+        }
+        .test-info h2 {
+            margin-top: 0;
+            color: #0066cc;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-info">
+        <h2>PlayerManagementUI Manual Test</h2>
+        <p>This page tests the PlayerManagementUI component functionality:</p>
+        <ul>
+            <li>Add players with unique names</li>
+            <li>Display player count (X/20)</li>
+            <li>Remove players with confirmation</li>
+            <li>Show validation feedback messages</li>
+            <li>Disable add button when 20 players reached</li>
+        </ul>
+    </div>
+
+    <div class="container">
+        <section id="player-management" class="card">
+            <h2>Player Management</h2>
+            <div id="player-form-container">
+                <form id="add-player-form">
+                    <input type="text" id="player-name-input" placeholder="Enter player name" required>
+                    <button type="submit">Add Player</button>
+                </form>
+                <div id="player-count"></div>
+            </div>
+            <div id="player-list"></div>
+            <div id="player-feedback" class="feedback"></div>
+        </section>
+    </div>
+
+    <script type="module">
+        import { PlayerManager, PlayerManagementUI, Storage } from './app.js';
+
+        // Clear storage for clean test
+        Storage.clear();
+        
+        // Initialize
+        PlayerManager.initialize();
+        PlayerManagementUI.initialize();
+
+        console.log('PlayerManagementUI test page loaded');
+        console.log('Try adding players, removing them, and testing the 20 player limit');
+    </script>
+</body>
+</html>

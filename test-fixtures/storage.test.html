@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Storage Property Tests</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+        .test-result {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .pass {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .fail {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .running {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+        pre {
+            background-color: #f4f4f4;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Pool Score Tracker - Storage Property Tests</h1>
+    <div id="test-results"></div>
+
+    <!-- Load application code -->
+    <script src="../app.js"></script>
+
+    <!-- Load fast-check from CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/fast-check@3.15.0/lib/bundle.js"></script>
+    
+    <!-- Test code -->
+    <script defer>
+        const resultsDiv = document.getElementById('test-results');
+
+        function addTestResult(name, status, message, details = '') {
+            const div = document.createElement('div');
+            div.className = `test-result ${status}`;
+            
+            const title = document.createElement('h3');
+            title.textContent = `${status === 'pass' ? '✓' : status === 'fail' ? '✗' : '⏳'} ${name}`;
+            div.appendChild(title);
+            
+            if (message) {
+                const msg = document.createElement('p');
+                msg.textContent = message;
+                div.appendChild(msg);
+            }
+            
+            if (details) {
+                const pre = document.createElement('pre');
+                pre.textContent = details;
+                div.appendChild(pre);
+            }
+            
+            resultsDiv.appendChild(div);
+            return div;
+        }
+
+        // Feature: pool-score-tracker, Property 15: Storage Round Trip
+        // Validates: Requirements 5.1, 5.2
+        async function runStorageRoundTripTest() {
+            const testDiv = addTestResult(
+                'Property 15: Storage Round Trip',
+                'running',
+                'Testing that save/load produces equivalent state...'
+            );
+
+            try {
+                // Check if fast-check is available (can be 'fc' or 'fastcheck')
+                const fc = typeof window.fc !== 'undefined' ? window.fc : 
+                          typeof window.fastcheck !== 'undefined' ? window.fastcheck :
+                          typeof fastcheck !== 'undefined' ? fastcheck : undefined;
+                
+                if (!fc) {
+                    throw new Error('fast-check library not loaded. Please check your internet connection and refresh.');
+                }
+
+                // Clear storage before test
+                Storage.clear();
+
+                // Arbitrary for Player
+                const playerArbitrary = fc.record({
+                    id: fc.uuid(),
+                    name: fc.string({ minLength: 1, maxLength: 50 }),
+                    gamesPlayed: fc.nat({ max: 1000 }),
+                    wins: fc.nat({ max: 1000 }),
+                    createdAt: fc.date().map(d => d.toISOString())
+                });
+
+                // Arbitrary for Game
+                const gameArbitrary = fc.record({
+                    id: fc.uuid(),
+                    player1Id: fc.uuid(),
+                    player2Id: fc.uuid(),
+                    player1Score: fc.nat({ max: 100 }),
+                    player2Score: fc.nat({ max: 100 }),
+                    winnerId: fc.oneof(fc.uuid(), fc.constant(null)),
+                    timestamp: fc.date().map(d => d.toISOString())
+                });
+
+                // Arbitrary for application state
+                const appStateArbitrary = fc.record({
+                    players: fc.array(playerArbitrary, { maxLength: 20 }),
+                    games: fc.array(gameArbitrary, { maxLength: 100 })
+                });
+
+                // Property: For any valid application state, save then load should produce equivalent state
+                const property = fc.property(appStateArbitrary, (state) => {
+                    // Clear storage before each iteration
+                    Storage.clear();
+
+                    // Save the state
+                    Storage.savePlayers(state.players);
+                    Storage.saveGames(state.games);
+
+                    // Load the state back
+                    const loadedPlayers = Storage.loadPlayers();
+                    const loadedGames = Storage.loadGames();
+
+                    // Verify players match
+                    if (loadedPlayers.length !== state.players.length) {
+                        return false;
+                    }
+
+                    for (let i = 0; i < state.players.length; i++) {
+                        const original = state.players[i];
+                        const loaded = loadedPlayers[i];
+
+                        if (original.id !== loaded.id ||
+                            original.name !== loaded.name ||
+                            original.gamesPlayed !== loaded.gamesPlayed ||
+                            original.wins !== loaded.wins ||
+                            original.createdAt !== loaded.createdAt) {
+                            return false;
+                        }
+                    }
+
+                    // Verify games match
+                    if (loadedGames.length !== state.games.length) {
+                        return false;
+                    }
+
+                    for (let i = 0; i < state.games.length; i++) {
+                        const original = state.games[i];
+                        const loaded = loadedGames[i];
+
+                        if (original.id !== loaded.id ||
+                            original.player1Id !== loaded.player1Id ||
+                            original.player2Id !== loaded.player2Id ||
+                            original.player1Score !== loaded.player1Score ||
+                            original.player2Score !== loaded.player2Score ||
+                            original.winnerId !== loaded.winnerId ||
+                            original.timestamp !== loaded.timestamp) {
+                            return false;
+                        }
+                    }
+
+                    return true;
+                });
+
+                // Run the property test with 100 iterations
+                const result = await fc.check(property, { numRuns: 100 });
+
+                if (result.failed) {
+                    testDiv.className = 'test-result fail';
+                    testDiv.querySelector('h3').textContent = '✗ Property 15: Storage Round Trip';
+                    testDiv.querySelector('p').textContent = 'FAILED: Storage round trip property violated';
+                    
+                    const details = document.createElement('pre');
+                    details.textContent = `Counterexample found:\n${JSON.stringify(result.counterexample, null, 2)}\n\nError: ${result.error}`;
+                    testDiv.appendChild(details);
+                    
+                    return { passed: false, counterexample: result.counterexample, error: result.error };
+                } else {
+                    testDiv.className = 'test-result pass';
+                    testDiv.querySelector('h3').textContent = '✓ Property 15: Storage Round Trip';
+                    testDiv.querySelector('p').textContent = `PASSED: Verified with ${result.numRuns} random application states`;
+                    
+                    return { passed: true, numRuns: result.numRuns };
+                }
+            } catch (error) {
+                testDiv.className = 'test-result fail';
+                testDiv.querySelector('h3').textContent = '✗ Property 15: Storage Round Trip';
+                testDiv.querySelector('p').textContent = 'ERROR: Test execution failed';
+                
+                const details = document.createElement('pre');
+                details.textContent = error.stack || error.message;
+                testDiv.appendChild(details);
+                
+                return { passed: false, error: error.message };
+            } finally {
+                // Clean up
+                Storage.clear();
+            }
+        }
+
+        // Run tests when page loads
+        window.addEventListener('load', async () => {
+            // Wait for fast-check to load
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            console.log('Checking for fast-check library...');
+            console.log('window.fc:', typeof window.fc);
+            console.log('window.fastcheck:', typeof window.fastcheck);
+            
+            if (typeof window.fc === 'undefined' && typeof window.fastcheck === 'undefined') {
+                addTestResult(
+                    'Property 15: Storage Round Trip',
+                    'fail',
+                    'ERROR: fast-check library failed to load',
+                    'Please check your internet connection and refresh the page. The CDN may be blocked or unavailable.'
+                );
+                return;
+            }
+            
+            console.log('Running Property-Based Tests...');
+            const result = await runStorageRoundTripTest();
+            console.log('Test Result:', result);
+        });
+    </script>
+</body>
+</html>

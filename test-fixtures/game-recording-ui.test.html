@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GameRecordingUI Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .test-result {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .pass {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .fail {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .feedback {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            display: none;
+        }
+        .feedback.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: block;
+        }
+        .feedback.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            display: block;
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        label {
+            font-weight: 500;
+        }
+        input, select, button {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        button:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <h1>GameRecordingUI Component Test</h1>
+
+    <div class="test-section">
+        <h2>Test UI</h2>
+        <form id="record-game-form">
+            <div class="form-group">
+                <label for="player1-select">Player 1:</label>
+                <select id="player1-select" required>
+                    <option value="">Select Player 1</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="player1-score">Score:</label>
+                <input type="number" id="player1-score" min="0" required>
+            </div>
+            <div class="form-group">
+                <label for="player2-select">Player 2:</label>
+                <select id="player2-select" required>
+                    <option value="">Select Player 2</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="player2-score">Score:</label>
+                <input type="number" id="player2-score" min="0" required>
+            </div>
+            <button type="submit">Record Game</button>
+        </form>
+        <div id="game-feedback" class="feedback"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test Results</h2>
+        <div id="test-results"></div>
+    </div>
+
+    <script type="module">
+        import { 
+            PlayerManager, 
+            GameManager, 
+            Storage,
+            GameRecordingUI 
+        } from './app.js';
+
+        const testResults = document.getElementById('test-results');
+
+        function addTestResult(testName, passed, message) {
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `test-result ${passed ? 'pass' : 'fail'}`;
+            resultDiv.textContent = `${passed ? '✓' : '✗'} ${testName}: ${message}`;
+            testResults.appendChild(resultDiv);
+        }
+
+        // Clear storage before tests
+        Storage.clear();
+
+        // Initialize managers
+        PlayerManager.initialize();
+        GameManager.initialize();
+
+        // Test 1: Initialize GameRecordingUI
+        try {
+            GameRecordingUI.initialize();
+            addTestResult('Initialize', true, 'GameRecordingUI initialized successfully');
+        } catch (error) {
+            addTestResult('Initialize', false, error.message);
+        }
+
+        // Test 2: Render with no players
+        try {
+            GameRecordingUI.render();
+            const player1Select = document.getElementById('player1-select');
+            const player2Select = document.getElementById('player2-select');
+            const submitButton = document.querySelector('#record-game-form button[type="submit"]');
+            
+            if (player1Select.options.length === 1 && player2Select.options.length === 1) {
+                addTestResult('Render with no players', true, 'Dropdowns show only placeholder option');
+            } else {
+                addTestResult('Render with no players', false, 'Dropdowns should have only placeholder');
+            }
+
+            if (submitButton.disabled) {
+                addTestResult('Disable form with < 2 players', true, 'Submit button is disabled');
+            } else {
+                addTestResult('Disable form with < 2 players', false, 'Submit button should be disabled');
+            }
+        } catch (error) {
+            addTestResult('Render with no players', false, error.message);
+        }
+
+        // Test 3: Add players and render
+        try {
+            PlayerManager.addPlayer('Alice');
+            PlayerManager.addPlayer('Bob');
+            PlayerManager.addPlayer('Charlie');
+            
+            GameRecordingUI.render();
+            
+            const player1Select = document.getElementById('player1-select');
+            const player2Select = document.getElementById('player2-select');
+            
+            if (player1Select.options.length === 4 && player2Select.options.length === 4) {
+                addTestResult('Render with players', true, 'Dropdowns populated with 3 players + placeholder');
+            } else {
+                addTestResult('Render with players', false, `Expected 4 options, got ${player1Select.options.length}`);
+            }
+
+            const submitButton = document.querySelector('#record-game-form button[type="submit"]');
+            if (!submitButton.disabled) {
+                addTestResult('Enable form with >= 2 players', true, 'Submit button is enabled');
+            } else {
+                addTestResult('Enable form with >= 2 players', false, 'Submit button should be enabled');
+            }
+        } catch (error) {
+            addTestResult('Render with players', false, error.message);
+        }
+
+        // Test 4: Record a valid game
+        try {
+            const player1 = PlayerManager.getAllPlayers()[0];
+            const player2 = PlayerManager.getAllPlayers()[1];
+            
+            document.getElementById('player1-select').value = player1.id;
+            document.getElementById('player2-select').value = player2.id;
+            document.getElementById('player1-score').value = '10';
+            document.getElementById('player2-score').value = '8';
+            
+            GameRecordingUI.handleRecordGame();
+            
+            const games = GameManager.getGameHistory();
+            if (games.length === 1) {
+                addTestResult('Record valid game', true, 'Game recorded successfully');
+            } else {
+                addTestResult('Record valid game', false, `Expected 1 game, got ${games.length}`);
+            }
+
+            // Check if form was reset
+            if (document.getElementById('player1-select').value === '') {
+                addTestResult('Form reset after success', true, 'Form fields cleared');
+            } else {
+                addTestResult('Form reset after success', false, 'Form should be reset');
+            }
+        } catch (error) {
+            addTestResult('Record valid game', false, error.message);
+        }
+
+        // Test 5: Validate same player rejection
+        try {
+            const player1 = PlayerManager.getAllPlayers()[0];
+            
+            document.getElementById('player1-select').value = player1.id;
+            document.getElementById('player2-select').value = player1.id;
+            document.getElementById('player1-score').value = '10';
+            document.getElementById('player2-score').value = '8';
+            
+            const gameCountBefore = GameManager.games.length;
+            GameRecordingUI.handleRecordGame();
+            const gameCountAfter = GameManager.games.length;
+            
+            if (gameCountBefore === gameCountAfter) {
+                addTestResult('Same player rejection', true, 'Game with same player rejected');
+            } else {
+                addTestResult('Same player rejection', false, 'Should reject same player');
+            }
+        } catch (error) {
+            addTestResult('Same player rejection', false, error.message);
+        }
+
+        // Test 6: Validate missing player selection
+        try {
+            document.getElementById('player1-select').value = '';
+            document.getElementById('player2-select').value = '';
+            document.getElementById('player1-score').value = '10';
+            document.getElementById('player2-score').value = '8';
+            
+            const gameCountBefore = GameManager.games.length;
+            GameRecordingUI.handleRecordGame();
+            const gameCountAfter = GameManager.games.length;
+            
+            if (gameCountBefore === gameCountAfter) {
+                addTestResult('Missing player validation', true, 'Empty player selection rejected');
+            } else {
+                addTestResult('Missing player validation', false, 'Should reject empty selection');
+            }
+        } catch (error) {
+            addTestResult('Missing player validation', false, error.message);
+        }
+
+        // Test 7: Validate negative scores
+        try {
+            const player1 = PlayerManager.getAllPlayers()[0];
+            const player2 = PlayerManager.getAllPlayers()[1];
+            
+            document.getElementById('player1-select').value = player1.id;
+            document.getElementById('player2-select').value = player2.id;
+            document.getElementById('player1-score').value = '-5';
+            document.getElementById('player2-score').value = '8';
+            
+            const gameCountBefore = GameManager.games.length;
+            GameRecordingUI.handleRecordGame();
+            const gameCountAfter = GameManager.games.length;
+            
+            if (gameCountBefore === gameCountAfter) {
+                addTestResult('Negative score validation', true, 'Negative score rejected');
+            } else {
+                addTestResult('Negative score validation', false, 'Should reject negative scores');
+            }
+        } catch (error) {
+            addTestResult('Negative score validation', false, error.message);
+        }
+
+        // Test 8: Test feedback display
+        try {
+            const feedbackContainer = document.getElementById('game-feedback');
+            
+            GameRecordingUI.showFeedback('Test success message', 'success');
+            if (feedbackContainer.classList.contains('success')) {
+                addTestResult('Success feedback display', true, 'Success message displayed correctly');
+            } else {
+                addTestResult('Success feedback display', false, 'Success class not applied');
+            }
+
+            GameRecordingUI.showFeedback('Test error message', 'error');
+            if (feedbackContainer.classList.contains('error')) {
+                addTestResult('Error feedback display', true, 'Error message displayed correctly');
+            } else {
+                addTestResult('Error feedback display', false, 'Error class not applied');
+            }
+        } catch (error) {
+            addTestResult('Feedback display', false, error.message);
+        }
+
+        console.log('All tests completed');
+    </script>
+</body>
+</html>

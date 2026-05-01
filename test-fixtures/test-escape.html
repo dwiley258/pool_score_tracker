@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test HTML Escaping</title>
+</head>
+<body>
+    <div id="test"></div>
+    
+    <script type="module">
+        import { PlayerManager, PlayerManagementUI, Storage } from './app.js';
+        
+        // Clear and initialize
+        Storage.clear();
+        PlayerManager.players = [];
+        
+        // Add a player with HTML
+        const result = PlayerManager.addPlayer('<script>alert("xss")</script>');
+        console.log('Added player:', result);
+        
+        // Render
+        const container = document.createElement('div');
+        container.id = 'player-list';
+        document.body.appendChild(container);
+        
+        PlayerManagementUI.renderPlayerList();
+        
+        // Check the HTML
+        const html = container.innerHTML;
+        console.log('Container innerHTML:', html);
+        console.log('Contains <script>:', html.includes('<script>'));
+        console.log('Contains &lt;script&gt;:', html.includes('&lt;script&gt;'));
+        
+        // Check the text content
+        const playerName = container.querySelector('.player-name');
+        if (playerName) {
+            console.log('Player name textContent:', playerName.textContent);
+            console.log('Player name innerHTML:', playerName.innerHTML);
+        }
+        
+        // Test escapeHtml directly
+        const escaped = PlayerManagementUI.escapeHtml('<script>alert("xss")</script>');
+        console.log('Direct escapeHtml result:', escaped);
+        
+        // Test what happens when we set innerHTML with escaped content
+        const testDiv = document.getElementById('test');
+        testDiv.innerHTML = `<span>${escaped}</span>`;
+        console.log('Test div innerHTML:', testDiv.innerHTML);
+    </script>
+</body>
+</html>

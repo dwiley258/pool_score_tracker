@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StatisticsCalculator Tests</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+        .test-suite {
+            margin-bottom: 20px;
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .test-pass {
+            color: green;
+            margin: 5px 0;
+        }
+        .test-fail {
+            color: red;
+            margin: 5px 0;
+        }
+        .summary {
+            font-weight: bold;
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f0f0f0;
+            border-radius: 5px;
+        }
+        h2 {
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <h1>StatisticsCalculator Unit Tests</h1>
+    <div id="test-results"></div>
+
+    <script src="../app.js"></script>
+    <script>
+        // Simple test framework
+        const results = [];
+        let currentSuite = '';
+
+        function describe(name, fn) {
+            currentSuite = name;
+            fn();
+        }
+
+        function it(description, fn) {
+            try {
+                fn();
+                results.push({ suite: currentSuite, test: description, passed: true });
+            } catch (error) {
+                results.push({ suite: currentSuite, test: description, passed: false, error: error.message });
+            }
+        }
+
+        function expect(actual) {
+            return {
+                toBe(expected) {
+                    if (actual !== expected) {
+                        throw new Error(`Expected ${expected} but got ${actual}`);
+                    }
+                },
+                toBeLessThan(expected) {
+                    if (actual >= expected) {
+                        throw new Error(`Expected ${actual} to be less than ${expected}`);
+                    }
+                }
+            };
+        }
+
+        function beforeEach(fn) {
+            // Execute before each test in the suite
+            // For simplicity, we'll call it manually in each test
+        }
+
+        // Run tests
+        describe('StatisticsCalculator', () => {
+            describe('calculatePlayerStats', () => {
+                it('should calculate correct stats for a player with games', () => {
+                    localStorage.clear();
+                    PlayerManager.players = [];
+                    GameManager.games = [];
+                    
+                    const result1 = PlayerManager.addPlayer('Alice');
+                    const result2 = PlayerManager.addPlayer('Bob');
+                    const aliceId = result1.data.id;
+                    const bobId = result2.data.id;
+                    
+                    GameManager.recordGame(aliceId, bobId, 10, 5);
+                    GameManager.recordGame(aliceId, bobId, 8, 12);
+                    GameManager.recordGame(aliceId, bobId, 15, 10);
+                    GameManager.recordGame(aliceId, bobId, 7, 7);
+                    
+                    const stats = StatisticsCalculator.calculatePlayerStats(aliceId, GameManager.games);
+                    
+                    expect(stats.gamesPlayed).toBe(4);
+                    expect(stats.wins).toBe(2);
+                    expect(stats.losses).toBe(1);
+                    expect(stats.ties).toBe(1);
+                    expect(stats.winPercentage).toBe(50.00);
+                });
+
+                it('should return zero stats for player with no games', () => {
+                    localStorage.clear();
+                    PlayerManager.players = [];
+                    GameManager.games = [];
+                    
+                    const result = PlayerManager.addPlayer('Alice');
+                    const aliceId = result.data.id;
+                    
+                    const stats = StatisticsCalculator.calculatePlayerStats(aliceId, GameManager.games);
+                    
+                    expect(stats.gamesPlayed).toBe(0);
+                    expect(stats.wins).toBe(0);
+                    expect(stats.losses).toBe(0);
+                    expect(stats.ties).toBe(0);
+                    expect(stats.winPercentage).toBe(0);
+                });
+
+                it('should calculate win percentage correctly', () => {
+                    localStorage.clear();
+                    PlayerManager.players = [];
+                    GameManager.games = [];
+                    
+                    const result1 = PlayerManager.addPlayer('Alice');
+                    const result2 = PlayerManager.addPlayer('Bob');
+                    const aliceId = result1.data.id;
+                    const bobId = result2.data.id;
+                    
+                    GameManager.recordGame(aliceId, bobId, 10, 5);
+                    GameManager.recordGame(aliceId, bobId, 8, 12);
+                    GameManager.recordGame(aliceId, bobId, 15, 10);
+                    GameManager.recordGame(aliceId, bobId, 20, 15);
+                    
+                    const stats = StatisticsCalculator.calculatePlayerStats(aliceId, GameManager.games);
+                    
+                    expect(stats.winPercentage).toBe(75.00);
+                });
+            });
+
+            describe('generateLeaderboard', () => {
+                it('should sort players by win percentage descending', () => {
+                    localStorage.clear();
+                    PlayerManager.players = [];
+                    GameManager.games = [];
+                    
+                    const alice = PlayerManager.addPlayer('Alice').data;
+                    const bob = PlayerManager.addPlayer('Bob').data;
+                    const charlie = PlayerManager.addPlayer('Charlie').data;
+                    
+                    // Alice plays 8 games total: 3 wins vs Bob, 0 wins vs Charlie = 3/8 = 37.5%
+                    GameManager.recordGame(alice.id, bob.id, 10, 5);   // Alice wins
+                    GameManager.recordGame(alice.id, bob.id, 10, 5);   // Alice wins
+                    GameManager.recordGame(alice.id, bob.id, 10, 5);   // Alice wins
+                    GameManager.recordGame(alice.id, bob.id, 5, 10);   // Bob wins
+                    
+                    // Bob plays 5 games total: 1 win vs Alice, 1 win vs Charlie = 2/5 = 40%
+                    GameManager.recordGame(bob.id, charlie.id, 10, 5); // Bob wins
+                    
+                    // Charlie plays 5 games total: 4 wins vs Alice, 0 wins vs Bob = 4/5 = 80%
+                    GameManager.recordGame(charlie.id, alice.id, 10, 5); // Charlie wins
+                    GameManager.recordGame(charlie.id, alice.id, 10, 5); // Charlie wins
+                    GameManager.recordGame(charlie.id, alice.id, 10, 5); // Charlie wins
+                    GameManager.recordGame(charlie.id, alice.id, 10, 5); // Charlie wins
+                    
+                    const leaderboard = StatisticsCalculator.generateLeaderboard(PlayerManager.players);
+                    
+                    expect(leaderboard.length).toBe(3);
+                    // Expected order: Charlie (80%), Bob (40%), Alice (37.5%)
+                    expect(leaderboard[0].player.name).toBe('Charlie');
+                    expect(leaderboard[0].rank).toBe(1);
+                    expect(leaderboard[1].player.name).toBe('Bob');
+                    expect(leaderboard[1].rank).toBe(2);
+                    expect(leaderboard[2].player.name).toBe('Alice');
+                    expect(leaderboard[2].rank).toBe(3);
+                });
+
+                it('should break ties by total wins', () => {
+                    localStorage.clear();
+                    PlayerManager.players = [];
+                    GameManager.games = [];
+                    
+                    const alice = PlayerManager.addPlayer('Alice').data;
+                    const bob = PlayerManager.addPlayer('Bob').data;
+                    const charlie = PlayerManager.addPlayer('Charlie').data;
+                    
+                    // Alice: 2/4 = 50%, 2 wins
+                    GameManager.recordGame(alice.id, charlie.id, 10, 5);
+                    GameManager.recordGame(alice.id, charlie.id, 10, 5);
+                    GameManager.recordGame(alice.id, charlie.id, 5, 10);
+                    GameManager.recordGame(alice.id, charlie.id, 5, 10);
+                    
+                    // Bob: 1/2 = 50%, 1 win
+                    GameManager.recordGame(bob.id, charlie.id, 10, 5);
+                    GameManager.recordGame(bob.id, charlie.id, 5, 10);
+                    
+                    const leaderboard = StatisticsCalculator.generateLeaderboard(PlayerManager.players);
+                    
+                    const aliceRank = leaderboard.find(e => e.player.name === 'Alice').rank;
+                    const bobRank = leaderboard.find(e => e.player.name === 'Bob').rank;
+                    
+                    expect(aliceRank).toBeLessThan(bobRank);
+                });
+
+                it('should handle empty player list', () => {
+                    localStorage.clear();
+                    PlayerManager.players = [];
+                    GameManager.games = [];
+                    
+                    const leaderboard = StatisticsCalculator.generateLeaderboard([]);
+                    expect(leaderboard.length).toBe(0);
+                });
+            });
+
+            describe('recalculateAllStats', () => {
+                it('should update player statistics based on game history', () => {
+                    localStorage.clear();
+                    PlayerManager.players = [];
+                    GameManager.games = [];
+                    
+                    const alice = PlayerManager.addPlayer('Alice').data;
+                    const bob = PlayerManager.addPlayer('Bob').data;
+                    
+                    GameManager.recordGame(alice.id, bob.id, 10, 5);
+                    GameManager.recordGame(alice.id, bob.id, 8, 12);
+                    
+                    alice.gamesPlayed = 999;
+                    alice.wins = 999;
+                    
+                    StatisticsCalculator.recalculateAllStats(PlayerManager.players, GameManager.games);
+                    
+                    expect(alice.gamesPlayed).toBe(2);
+                    expect(alice.wins).toBe(1);
+                });
+
+                it('should handle players with no games', () => {
+                    localStorage.clear();
+                    PlayerManager.players = [];
+                    GameManager.games = [];
+                    
+                    const alice = PlayerManager.addPlayer('Alice').data;
+                    
+                    alice.gamesPlayed = 5;
+                    alice.wins = 3;
+                    
+                    StatisticsCalculator.recalculateAllStats(PlayerManager.players, GameManager.games);
+                    
+                    expect(alice.gamesPlayed).toBe(0);
+                    expect(alice.wins).toBe(0);
+                });
+            });
+        });
+
+        // Display results
+        const resultsDiv = document.getElementById('test-results');
+        const suites = {};
+        
+        results.forEach(result => {
+            if (!suites[result.suite]) {
+                suites[result.suite] = [];
+            }
+            suites[result.suite].push(result);
+        });
+
+        let totalPassed = 0;
+        let totalFailed = 0;
+
+        Object.keys(suites).forEach(suiteName => {
+            const suiteDiv = document.createElement('div');
+            suiteDiv.className = 'test-suite';
+            
+            const suiteTitle = document.createElement('h2');
+            suiteTitle.textContent = suiteName;
+            suiteDiv.appendChild(suiteTitle);
+
+            suites[suiteName].forEach(result => {
+                const testDiv = document.createElement('div');
+                testDiv.className = result.passed ? 'test-pass' : 'test-fail';
+                testDiv.textContent = `${result.passed ? '✓' : '✗'} ${result.test}`;
+                
+                if (!result.passed) {
+                    const errorDiv = document.createElement('div');
+                    errorDiv.style.marginLeft = '20px';
+                    errorDiv.style.fontSize = '0.9em';
+                    errorDiv.textContent = `Error: ${result.error}`;
+                    testDiv.appendChild(errorDiv);
+                    totalFailed++;
+                } else {
+                    totalPassed++;
+                }
+                
+                suiteDiv.appendChild(testDiv);
+            });
+
+            resultsDiv.appendChild(suiteDiv);
+        });
+
+        const summary = document.createElement('div');
+        summary.className = 'summary';
+        summary.textContent = `Tests: ${totalPassed} passed, ${totalFailed} failed, ${totalPassed + totalFailed} total`;
+        resultsDiv.appendChild(summary);
+    </script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+{
+  "name": "pool-score-tracker",
+  "version": "1.0.0",
+  "description": "Pool Score Tracker Application",
+  "type": "module",
+  "homepage": "https://dwiley258.github.io/pool-score-tracker/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dwiley258/pool-score-tracker.git"
+  },
+  "license": "MIT",
+  "keywords": [
+    "pool",
+    "billiards",
+    "score-tracker",
+    "vanilla-js",
+    "localstorage"
+  ],
+  "scripts": {
+    "test": "vitest --run",
+    "test:watch": "vitest",
+    "dev": "npx http-server -p 8080 -o"
+  },
+  "devDependencies": {
+    "vitest": "^1.0.0",
+    "fast-check": "^3.15.0",
+    "jsdom": "^23.0.0",
+    "http-server": "^14.1.1"
+  }
+}

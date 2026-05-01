@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Storage Property Tests (Standalone)</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+        .test-result {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .pass {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .fail {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .running {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+        pre {
+            background-color: #f4f4f4;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Pool Score Tracker - Storage Property Tests</h1>
+    <p><em>Standalone version - no external dependencies</em></p>
+    <div id="test-results"></div>
+
+    <!-- Load application code -->
+    <script src="../app.js"></script>
+
+    <!-- Minimal Property-Based Testing Framework -->
+    <script>
+        // Simple random generators for property-based testing
+        const Gen = {
+            uuid() {
+                return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                    const r = Math.random() * 16 | 0;
+                    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                    return v.toString(16);
+                });
+            },
+            
+            string(minLength = 1, maxLength = 50) {
+                const length = Math.floor(Math.random() * (maxLength - minLength + 1)) + minLength;
+                const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 ';
+                let result = '';
+                for (let i = 0; i < length; i++) {
+                    result += chars.charAt(Math.floor(Math.random() * chars.length));
+                }
+                return result;
+            },
+            
+            nat(max = 1000) {
+                return Math.floor(Math.random() * (max + 1));
+            },
+            
+            date() {
+                const start = new Date(2020, 0, 1).getTime();
+                const end = new Date(2025, 11, 31).getTime();
+                return new Date(start + Math.random() * (end - start));
+            },
+            
+            array(generator, maxLength = 100) {
+                const length = Math.floor(Math.random() * (maxLength + 1));
+                const result = [];
+                for (let i = 0; i < length; i++) {
+                    result.push(generator());
+                }
+                return result;
+            },
+            
+            oneOf(...values) {
+                return values[Math.floor(Math.random() * values.length)];
+            }
+        };
+
+        // Generate random Player
+        function generatePlayer() {
+            return {
+                id: Gen.uuid(),
+                name: Gen.string(1, 50),
+                gamesPlayed: Gen.nat(1000),
+                wins: Gen.nat(1000),
+                createdAt: Gen.date().toISOString()
+            };
+        }
+
+        // Generate random Game
+        function generateGame() {
+            return {
+                id: Gen.uuid(),
+                player1Id: Gen.uuid(),
+                player2Id: Gen.uuid(),
+                player1Score: Gen.nat(100),
+                player2Score: Gen.nat(100),
+                winnerId: Gen.oneOf(Gen.uuid(), null),
+                timestamp: Gen.date().toISOString()
+            };
+        }
+
+        // Generate random application state
+        function generateAppState() {
+            return {
+                players: Gen.array(generatePlayer, 20),
+                games: Gen.array(generateGame, 100)
+            };
+        }
+
+        // Property test runner
+        function checkProperty(property, numRuns = 100) {
+            const failures = [];
+            
+            for (let i = 0; i < numRuns; i++) {
+                try {
+                    const result = property();
+                    if (!result.passed) {
+                        failures.push({
+                            iteration: i + 1,
+                            input: result.input,
+                            reason: result.reason
+                        });
+                        // Stop on first failure
+                        break;
+                    }
+                } catch (error) {
+                    failures.push({
+                        iteration: i + 1,
+                        error: error.message,
+                        stack: error.stack
+                    });
+                    break;
+                }
+            }
+            
+            return {
+                passed: failures.length === 0,
+                numRuns: failures.length === 0 ? numRuns : failures[0].iteration,
+                failures: failures
+            };
+        }
+    </script>
+
+    <!-- Test code -->
+    <script>
+        const resultsDiv = document.getElementById('test-results');
+
+        function addTestResult(name, status, message, details = '') {
+            const div = document.createElement('div');
+            div.className = `test-result ${status}`;
+            
+            const title = document.createElement('h3');
+            title.textContent = `${status === 'pass' ? '✓' : status === 'fail' ? '✗' : '⏳'} ${name}`;
+            div.appendChild(title);
+            
+            if (message) {
+                const msg = document.createElement('p');
+                msg.textContent = message;
+                div.appendChild(msg);
+            }
+            
+            if (details) {
+                const pre = document.createElement('pre');
+                pre.textContent = details;
+                div.appendChild(pre);
+            }
+            
+            resultsDiv.appendChild(div);
+            return div;
+        }
+
+        // Feature: pool-score-tracker, Property 15: Storage Round Trip
+        // Validates: Requirements 5.1, 5.2
+        function runStorageRoundTripTest() {
+            const testDiv = addTestResult(
+                'Property 15: Storage Round Trip',
+                'running',
+                'Testing that save/load produces equivalent state with 100 random iterations...'
+            );
+
+            try {
+                // Property: For any valid application state, save then load should produce equivalent state
+                const property = () => {
+                    const state = generateAppState();
+                    
+                    // Clear storage before each iteration
+                    Storage.clear();
+
+                    // Save the state
+                    Storage.savePlayers(state.players);
+                    Storage.saveGames(state.games);
+
+                    // Load the state back
+                    const loadedPlayers = Storage.loadPlayers();
+                    const loadedGames = Storage.loadGames();
+
+                    // Verify players match
+                    if (loadedPlayers.length !== state.players.length) {
+                        return {
+                            passed: false,
+                            input: state,
+                            reason: `Player count mismatch: expected ${state.players.length}, got ${loadedPlayers.length}`
+                        };
+                    }
+
+                    for (let i = 0; i < state.players.length; i++) {
+                        const original = state.players[i];
+                        const loaded = loadedPlayers[i];
+
+                        if (original.id !== loaded.id) {
+                            return { passed: false, input: state, reason: `Player ${i} ID mismatch` };
+                        }
+                        if (original.name !== loaded.name) {
+                            return { passed: false, input: state, reason: `Player ${i} name mismatch` };
+                        }
+                        if (original.gamesPlayed !== loaded.gamesPlayed) {
+                            return { passed: false, input: state, reason: `Player ${i} gamesPlayed mismatch` };
+                        }
+                        if (original.wins !== loaded.wins) {
+                            return { passed: false, input: state, reason: `Player ${i} wins mismatch` };
+                        }
+                        if (original.createdAt !== loaded.createdAt) {
+                            return { passed: false, input: state, reason: `Player ${i} createdAt mismatch` };
+                        }
+                    }
+
+                    // Verify games match
+                    if (loadedGames.length !== state.games.length) {
+                        return {
+                            passed: false,
+                            input: state,
+                            reason: `Game count mismatch: expected ${state.games.length}, got ${loadedGames.length}`
+                        };
+                    }
+
+                    for (let i = 0; i < state.games.length; i++) {
+                        const original = state.games[i];
+                        const loaded = loadedGames[i];
+
+                        if (original.id !== loaded.id) {
+                            return { passed: false, input: state, reason: `Game ${i} ID mismatch` };
+                        }
+                        if (original.player1Id !== loaded.player1Id) {
+                            return { passed: false, input: state, reason: `Game ${i} player1Id mismatch` };
+                        }
+                        if (original.player2Id !== loaded.player2Id) {
+                            return { passed: false, input: state, reason: `Game ${i} player2Id mismatch` };
+                        }
+                        if (original.player1Score !== loaded.player1Score) {
+                            return { passed: false, input: state, reason: `Game ${i} player1Score mismatch` };
+                        }
+                        if (original.player2Score !== loaded.player2Score) {
+                            return { passed: false, input: state, reason: `Game ${i} player2Score mismatch` };
+                        }
+                        if (original.winnerId !== loaded.winnerId) {
+                            return { passed: false, input: state, reason: `Game ${i} winnerId mismatch` };
+                        }
+                        if (original.timestamp !== loaded.timestamp) {
+                            return { passed: false, input: state, reason: `Game ${i} timestamp mismatch` };
+                        }
+                    }
+
+                    return { passed: true };
+                };
+
+                // Run the property test with 100 iterations
+                const result = checkProperty(property, 100);
+
+                if (!result.passed) {
+                    testDiv.className = 'test-result fail';
+                    testDiv.querySelector('h3').textContent = '✗ Property 15: Storage Round Trip';
+                    testDiv.querySelector('p').textContent = `FAILED at iteration ${result.numRuns}: Storage round trip property violated`;
+                    
+                    const failure = result.failures[0];
+                    const details = document.createElement('pre');
+                    details.textContent = `Reason: ${failure.reason || failure.error}\n\n` +
+                        `Input state:\n${JSON.stringify(failure.input, null, 2).substring(0, 1000)}...`;
+                    testDiv.appendChild(details);
+                    
+                    return { passed: false, failure: failure };
+                } else {
+                    testDiv.className = 'test-result pass';
+                    testDiv.querySelector('h3').textContent = '✓ Property 15: Storage Round Trip';
+                    testDiv.querySelector('p').textContent = `PASSED: Verified with ${result.numRuns} random application states`;
+                    
+                    const details = document.createElement('pre');
+                    details.textContent = 'All iterations passed successfully!\n\n' +
+                        'The storage layer correctly preserves:\n' +
+                        '- Player data (id, name, gamesPlayed, wins, createdAt)\n' +
+                        '- Game data (id, player IDs, scores, winnerId, timestamp)\n' +
+                        '- Array ordering and completeness';
+                    testDiv.appendChild(details);
+                    
+                    return { passed: true, numRuns: result.numRuns };
+                }
+            } catch (error) {
+                testDiv.className = 'test-result fail';
+                testDiv.querySelector('h3').textContent = '✗ Property 15: Storage Round Trip';
+                testDiv.querySelector('p').textContent = 'ERROR: Test execution failed';
+                
+                const details = document.createElement('pre');
+                details.textContent = error.stack || error.message;
+                testDiv.appendChild(details);
+                
+                return { passed: false, error: error.message };
+            } finally {
+                // Clean up
+                Storage.clear();
+            }
+        }
+
+        // Run tests when page loads
+        window.addEventListener('load', () => {
+            console.log('Running Property-Based Tests (Standalone)...');
+            const result = runStorageRoundTripTest();
+            console.log('Test Result:', result);
+        });
+    </script>
+</body>
+</html>
