@@ -176,6 +176,76 @@ button:disabled:hover {
     display: block;
 }
 
+/* Group selection */
+#group-select-view {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+#group-list {
+    margin-top: 15px;
+}
+
+.group-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    border-bottom: 1px solid #eee;
+    transition: background-color 0.2s ease;
+}
+
+.group-item:hover {
+    background-color: #f8f9fa;
+}
+
+.group-item:last-child {
+    border-bottom: none;
+}
+
+.group-name {
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+.group-item-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.delete-group-btn {
+    background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+}
+
+.delete-group-btn:hover {
+    background: linear-gradient(135deg, #c0392b 0%, #a93226 100%);
+}
+
+.back-btn {
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 8px 14px;
+    font-size: 0.85rem;
+    background: rgba(255,255,255,0.2);
+    border: 1px solid rgba(255,255,255,0.4);
+}
+
+.back-btn:hover {
+    background: rgba(255,255,255,0.3);
+}
+
+#main-app header {
+    position: relative;
+}
+
+#current-group-name {
+    font-size: 0.9rem;
+    opacity: 0.85;
+    margin-top: 4px;
+}
+
 /* Player list */
 #player-list {
     margin-top: 15px;
@@ -649,7 +719,8 @@ tr.top-three:nth-child(3):hover {
     }
     
     .player-item:hover,
-    .game-item:hover {
+    .game-item:hover,
+    .group-item:hover {
         background-color: #3d3d3d;
     }
     
