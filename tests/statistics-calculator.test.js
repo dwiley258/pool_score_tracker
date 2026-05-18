@@ -17,35 +17,30 @@ const mockLocalStorage = (() => {
 global.localStorage = mockLocalStorage;
 
 // Import modules from app.js
-import { PlayerManager, GameManager, StatisticsCalculator } from '../app.js';
+import { PlayerManager, GameManager, StatisticsCalculator, GroupManager } from '../app.js';
 
 describe('StatisticsCalculator', () => {
-    beforeEach(() => {
-        // Clear storage and reset state
+    beforeEach(async () => {
         localStorage.clear();
-        if (typeof PlayerManager !== 'undefined') {
-            PlayerManager.players = [];
-            PlayerManager.initialize();
-        }
-        if (typeof GameManager !== 'undefined') {
-            GameManager.games = [];
-            GameManager.initialize();
-        }
+        GroupManager.groups = [{ id: 'test-group', name: 'Test', createdAt: new Date().toISOString(), playerIds: [] }];
+        GroupManager.currentGroupId = 'test-group';
+        PlayerManager.players = [];
+        await PlayerManager.initialize();
+        GameManager.games = [];
+        await GameManager.initialize();
     });
 
     describe('calculatePlayerStats', () => {
-        it('should calculate correct stats for a player with games', () => {
-            // Add players
-            const result1 = PlayerManager.addPlayer('Alice');
-            const result2 = PlayerManager.addPlayer('Bob');
+        it('should calculate correct stats for a player with games', async () => {
+            const result1 = await PlayerManager.addPlayer('Alice');
+            const result2 = await PlayerManager.addPlayer('Bob');
             const aliceId = result1.data.id;
             const bobId = result2.data.id;
             
-            // Record games: Alice wins 2, loses 1, ties 1
-            GameManager.recordGame(aliceId, bobId, 10, 5);  // Alice wins
-            GameManager.recordGame(aliceId, bobId, 8, 12);  // Alice loses
-            GameManager.recordGame(aliceId, bobId, 15, 10); // Alice wins
-            GameManager.recordGame(aliceId, bobId, 7, 7);   // Tie
+            await GameManager.recordGame(aliceId, bobId, 10, 5);
+            await GameManager.recordGame(aliceId, bobId, 8, 12);
+            await GameManager.recordGame(aliceId, bobId, 15, 10);
+            await GameManager.recordGame(aliceId, bobId, 7, 7);
             
             const stats = StatisticsCalculator.calculatePlayerStats(aliceId, GameManager.games);
             
@@ -56,8 +51,8 @@ describe('StatisticsCalculator', () => {
             expect(stats.winPercentage).toBe(50.00);
         });
 
-        it('should return zero stats for player with no games', () => {
-            const result = PlayerManager.addPlayer('Alice');
+        it('should return zero stats for player with no games', async () => {
+            const result = await PlayerManager.addPlayer('Alice');
             const aliceId = result.data.id;
             
             const stats = StatisticsCalculator.calculatePlayerStats(aliceId, GameManager.games);
@@ -69,17 +64,16 @@ describe('StatisticsCalculator', () => {
             expect(stats.winPercentage).toBe(0);
         });
 
-        it('should calculate win percentage correctly', () => {
-            const result1 = PlayerManager.addPlayer('Alice');
-            const result2 = PlayerManager.addPlayer('Bob');
+        it('should calculate win percentage correctly', async () => {
+            const result1 = await PlayerManager.addPlayer('Alice');
+            const result2 = await PlayerManager.addPlayer('Bob');
             const aliceId = result1.data.id;
             const bobId = result2.data.id;
             
-            // Alice wins 3 out of 4 games = 75%
-            GameManager.recordGame(aliceId, bobId, 10, 5);
-            GameManager.recordGame(aliceId, bobId, 8, 12);
-            GameManager.recordGame(aliceId, bobId, 15, 10);
-            GameManager.recordGame(aliceId, bobId, 20, 15);
+            await GameManager.recordGame(aliceId, bobId, 10, 5);
+            await GameManager.recordGame(aliceId, bobId, 8, 12);
+            await GameManager.recordGame(aliceId, bobId, 15, 10);
+            await GameManager.recordGame(aliceId, bobId, 20, 15);
             
             const stats = StatisticsCalculator.calculatePlayerStats(aliceId, GameManager.games);
             
@@ -88,30 +82,24 @@ describe('StatisticsCalculator', () => {
     });
 
     describe('generateLeaderboard', () => {
-        it('should sort players by win percentage descending', () => {
-            const alice = PlayerManager.addPlayer('Alice').data;
-            const bob = PlayerManager.addPlayer('Bob').data;
-            const charlie = PlayerManager.addPlayer('Charlie').data;
+        it('should sort players by win percentage descending', async () => {
+            const alice = (await PlayerManager.addPlayer('Alice')).data;
+            const bob = (await PlayerManager.addPlayer('Bob')).data;
+            const charlie = (await PlayerManager.addPlayer('Charlie')).data;
             
-            // Alice plays 8 games total: 3 wins vs Bob, 0 wins vs Charlie = 3/8 = 37.5%
-            GameManager.recordGame(alice.id, bob.id, 10, 5);   // Alice wins
-            GameManager.recordGame(alice.id, bob.id, 10, 5);   // Alice wins
-            GameManager.recordGame(alice.id, bob.id, 10, 5);   // Alice wins
-            GameManager.recordGame(alice.id, bob.id, 5, 10);   // Bob wins
-            
-            // Bob plays 5 games total: 1 win vs Alice, 1 win vs Charlie = 2/5 = 40%
-            GameManager.recordGame(bob.id, charlie.id, 10, 5); // Bob wins
-            
-            // Charlie plays 5 games total: 4 wins vs Alice, 0 wins vs Bob = 4/5 = 80%
-            GameManager.recordGame(charlie.id, alice.id, 10, 5); // Charlie wins
-            GameManager.recordGame(charlie.id, alice.id, 10, 5); // Charlie wins
-            GameManager.recordGame(charlie.id, alice.id, 10, 5); // Charlie wins
-            GameManager.recordGame(charlie.id, alice.id, 10, 5); // Charlie wins
+            await GameManager.recordGame(alice.id, bob.id, 10, 5);
+            await GameManager.recordGame(alice.id, bob.id, 10, 5);
+            await GameManager.recordGame(alice.id, bob.id, 10, 5);
+            await GameManager.recordGame(alice.id, bob.id, 5, 10);
+            await GameManager.recordGame(bob.id, charlie.id, 10, 5);
+            await GameManager.recordGame(charlie.id, alice.id, 10, 5);
+            await GameManager.recordGame(charlie.id, alice.id, 10, 5);
+            await GameManager.recordGame(charlie.id, alice.id, 10, 5);
+            await GameManager.recordGame(charlie.id, alice.id, 10, 5);
             
             const leaderboard = StatisticsCalculator.generateLeaderboard(PlayerManager.players);
             
             expect(leaderboard.length).toBe(3);
-            // Expected order: Charlie (80%), Bob (40%), Alice (37.5%)
             expect(leaderboard[0].player.name).toBe('Charlie');
             expect(leaderboard[0].rank).toBe(1);
             expect(leaderboard[1].player.name).toBe('Bob');
@@ -120,24 +108,20 @@ describe('StatisticsCalculator', () => {
             expect(leaderboard[2].rank).toBe(3);
         });
 
-        it('should break ties by total wins', () => {
-            const alice = PlayerManager.addPlayer('Alice').data;
-            const bob = PlayerManager.addPlayer('Bob').data;
-            const charlie = PlayerManager.addPlayer('Charlie').data;
+        it('should break ties by total wins', async () => {
+            const alice = (await PlayerManager.addPlayer('Alice')).data;
+            const bob = (await PlayerManager.addPlayer('Bob')).data;
+            const charlie = (await PlayerManager.addPlayer('Charlie')).data;
             
-            // Alice: 2/4 = 50%, 2 wins
-            GameManager.recordGame(alice.id, charlie.id, 10, 5);
-            GameManager.recordGame(alice.id, charlie.id, 10, 5);
-            GameManager.recordGame(alice.id, charlie.id, 5, 10);
-            GameManager.recordGame(alice.id, charlie.id, 5, 10);
-            
-            // Bob: 1/2 = 50%, 1 win
-            GameManager.recordGame(bob.id, charlie.id, 10, 5);
-            GameManager.recordGame(bob.id, charlie.id, 5, 10);
+            await GameManager.recordGame(alice.id, charlie.id, 10, 5);
+            await GameManager.recordGame(alice.id, charlie.id, 10, 5);
+            await GameManager.recordGame(alice.id, charlie.id, 5, 10);
+            await GameManager.recordGame(alice.id, charlie.id, 5, 10);
+            await GameManager.recordGame(bob.id, charlie.id, 10, 5);
+            await GameManager.recordGame(bob.id, charlie.id, 5, 10);
             
             const leaderboard = StatisticsCalculator.generateLeaderboard(PlayerManager.players);
             
-            // Alice should rank higher than Bob (same %, but more wins)
             const aliceRank = leaderboard.find(e => e.player.name === 'Alice').rank;
             const bobRank = leaderboard.find(e => e.player.name === 'Bob').rank;
             
@@ -151,28 +135,24 @@ describe('StatisticsCalculator', () => {
     });
 
     describe('recalculateAllStats', () => {
-        it('should update player statistics based on game history', () => {
-            const alice = PlayerManager.addPlayer('Alice').data;
-            const bob = PlayerManager.addPlayer('Bob').data;
+        it('should update player statistics based on game history', async () => {
+            const alice = (await PlayerManager.addPlayer('Alice')).data;
+            const bob = (await PlayerManager.addPlayer('Bob')).data;
             
-            // Record games
-            GameManager.recordGame(alice.id, bob.id, 10, 5);
-            GameManager.recordGame(alice.id, bob.id, 8, 12);
+            await GameManager.recordGame(alice.id, bob.id, 10, 5);
+            await GameManager.recordGame(alice.id, bob.id, 8, 12);
             
-            // Manually corrupt stats
             alice.gamesPlayed = 999;
             alice.wins = 999;
             
-            // Recalculate
             StatisticsCalculator.recalculateAllStats(PlayerManager.players, GameManager.games);
             
-            // Stats should be corrected
             expect(alice.gamesPlayed).toBe(2);
             expect(alice.wins).toBe(1);
         });
 
-        it('should handle players with no games', () => {
-            const alice = PlayerManager.addPlayer('Alice').data;
+        it('should handle players with no games', async () => {
+            const alice = (await PlayerManager.addPlayer('Alice')).data;
             
             alice.gamesPlayed = 5;
             alice.wins = 3;
@@ -184,5 +164,3 @@ describe('StatisticsCalculator', () => {
         });
     });
 });
-
-console.log('StatisticsCalculator unit tests defined. Run in browser with test framework.');

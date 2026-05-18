@@ -1,5 +1,5 @@
 import { db } from './firebase-config.js';
-import { collection, doc, getDocs, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { collection, doc, getDocs, setDoc, deleteDoc } from "firebase/firestore";
 
 // ============================================
 // Utility Functions
