@@ -58,27 +58,83 @@
                 <!-- Game Recording Section -->
                 <section id="game-recording" class="card">
                     <h2>Record Game</h2>
+                    <div class="mode-toggle" role="radiogroup" aria-label="Game mode">
+                        <label>
+                            <input type="radio" name="game-mode" value="singles" checked>
+                            <span>Singles (1v1)</span>
+                        </label>
+                        <label>
+                            <input type="radio" name="game-mode" value="duos">
+                            <span>Duos (2v2)</span>
+                        </label>
+                    </div>
                     <form id="record-game-form">
-                        <div class="form-group">
-                            <label for="player1-select">Player 1:</label>
-                            <select id="player1-select" required>
-                                <option value="">Select Player 1</option>
-                            </select>
+                        <!-- Singles fields -->
+                        <div id="singles-fields">
+                            <div class="form-group">
+                                <label for="player1-select">Player 1:</label>
+                                <select id="player1-select">
+                                    <option value="">Select Player 1</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="player1-score">Score:</label>
+                                <input type="number" id="player1-score" min="0" value="0">
+                            </div>
+                            <div class="form-group">
+                                <label for="player2-select">Player 2:</label>
+                                <select id="player2-select">
+                                    <option value="">Select Player 2</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="player2-score">Score:</label>
+                                <input type="number" id="player2-score" min="0" value="0">
+                            </div>
                         </div>
-                        <div class="form-group">
-                            <label for="player1-score">Score:</label>
-                            <input type="number" id="player1-score" min="0" value="0" required>
+
+                        <!-- Duos fields -->
+                        <div id="duos-fields" style="display: none;">
+                            <fieldset class="team-fieldset">
+                                <legend>Team 1</legend>
+                                <div class="form-group">
+                                    <label for="team1-player1-select">Player 1:</label>
+                                    <select id="team1-player1-select">
+                                        <option value="">Team 1 - Player 1</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="team1-player2-select">Player 2:</label>
+                                    <select id="team1-player2-select">
+                                        <option value="">Team 1 - Player 2</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="team1-score">Score:</label>
+                                    <input type="number" id="team1-score" min="0" value="0">
+                                </div>
+                            </fieldset>
+                            <fieldset class="team-fieldset">
+                                <legend>Team 2</legend>
+                                <div class="form-group">
+                                    <label for="team2-player1-select">Player 1:</label>
+                                    <select id="team2-player1-select">
+                                        <option value="">Team 2 - Player 1</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="team2-player2-select">Player 2:</label>
+                                    <select id="team2-player2-select">
+                                        <option value="">Team 2 - Player 2</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="team2-score">Score:</label>
+                                    <input type="number" id="team2-score" min="0" value="0">
+                                </div>
+                            </fieldset>
                         </div>
-                        <div class="form-group">
-                            <label for="player2-select">Player 2:</label>
-                            <select id="player2-select" required>
-                                <option value="">Select Player 2</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="player2-score">Score:</label>
-                            <input type="number" id="player2-score" min="0" value="0" required>
-                        </div>
+
                         <button type="submit">Record Game</button>
                     </form>
                     <div id="game-feedback" class="feedback"></div>

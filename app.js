@@ -34,11 +34,58 @@ function createGame(player1Id, player2Id, player1Score, player2Score) {
     
     return {
         id: generateUUID(),
+        type: 'singles',
         player1Id, player2Id,
         player1Score, player2Score,
         winnerId,
         timestamp: new Date().toISOString()
     };
+}
+
+function createDuosGame(team1, team2, team1Score, team2Score) {
+    let winningTeam = null;
+    if (team1Score > team2Score) winningTeam = 1;
+    else if (team2Score > team1Score) winningTeam = 2;
+
+    return {
+        id: generateUUID(),
+        type: 'duos',
+        team1: [...team1],
+        team2: [...team2],
+        team1Score, team2Score,
+        winningTeam,
+        timestamp: new Date().toISOString()
+    };
+}
+
+// ---- Game helpers (work for both singles and duos) ----
+
+// A game without an explicit `type` is treated as legacy singles.
+function isDuosGame(game) {
+    return game && game.type === 'duos';
+}
+
+function getGameParticipants(game) {
+    if (isDuosGame(game)) return [...game.team1, ...game.team2];
+    return [game.player1Id, game.player2Id];
+}
+
+function gameInvolvesPlayer(game, playerId) {
+    return getGameParticipants(game).includes(playerId);
+}
+
+function didPlayerWin(game, playerId) {
+    if (isDuosGame(game)) {
+        if (game.winningTeam === 1) return game.team1.includes(playerId);
+        if (game.winningTeam === 2) return game.team2.includes(playerId);
+        return false;
+    }
+    return game.winnerId === playerId;
+}
+
+function isGameTie(game) {
+    if (isDuosGame(game)) return game.winningTeam === null;
+    return game.winnerId === null;
 }
 
 // ============================================
@@ -270,31 +317,60 @@ const GameManager = {
         return { success: true, data: newGame };
     },
 
+    async recordDuosGame(team1, team2, score1, score2) {
+        if (!Array.isArray(team1) || !Array.isArray(team2) || team1.length !== 2 || team2.length !== 2) {
+            return { success: false, error: 'Each team must have exactly 2 players' };
+        }
+        const ids = [...team1, ...team2];
+        if (ids.some(id => !id)) return { success: false, error: 'Invalid player ID' };
+        if (new Set(ids).size !== 4) return { success: false, error: 'A player cannot appear more than once' };
+
+        const players = ids.map(id => PlayerManager.getPlayer(id));
+        if (players.some(p => !p)) return { success: false, error: 'Player does not exist' };
+        if (!Number.isInteger(score1) || score1 < 0 || !Number.isInteger(score2) || score2 < 0) {
+            return { success: false, error: 'Scores must be non-negative integers' };
+        }
+
+        const newGame = createDuosGame(team1, team2, score1, score2);
+        this.games.push(newGame);
+        players.forEach(p => p.gamesPlayed++);
+        players.forEach(p => { if (didPlayerWin(newGame, p.id)) p.wins++; });
+
+        try {
+            await Storage.saveGame(GroupManager.currentGroupId, newGame);
+            await Promise.all(players.map(p => Storage.savePlayer(p)));
+        } catch (error) {
+            this.games.pop();
+            players.forEach(p => p.gamesPlayed--);
+            players.forEach(p => { if (didPlayerWin(newGame, p.id)) p.wins--; });
+            return { success: false, error: error.message };
+        }
+        return { success: true, data: newGame };
+    },
+
     async deleteGame(gameId) {
         if (!gameId || typeof gameId !== 'string') return { success: false, error: 'Invalid game ID' };
         const gameIndex = this.games.findIndex(g => g.id === gameId);
         if (gameIndex === -1) return { success: false, error: 'Game does not exist' };
 
         const game = this.games[gameIndex];
-        const player1 = PlayerManager.getPlayer(game.player1Id);
-        const player2 = PlayerManager.getPlayer(game.player2Id);
-        const origStats = {
-            p1: player1 ? { gamesPlayed: player1.gamesPlayed, wins: player1.wins } : null,
-            p2: player2 ? { gamesPlayed: player2.gamesPlayed, wins: player2.wins } : null
-        };
+        const participants = getGameParticipants(game)
+            .map(id => PlayerManager.getPlayer(id))
+            .filter(Boolean);
+        const origStats = participants.map(p => ({ id: p.id, gamesPlayed: p.gamesPlayed, wins: p.wins }));
 
-        if (player1) { player1.gamesPlayed--; if (game.winnerId === player1.id) player1.wins--; }
-        if (player2) { player2.gamesPlayed--; if (game.winnerId === player2.id) player2.wins--; }
+        participants.forEach(p => { p.gamesPlayed--; if (didPlayerWin(game, p.id)) p.wins--; });
         const removedGame = this.games.splice(gameIndex, 1)[0];
 
         try {
             await Storage.deleteGame(GroupManager.currentGroupId, gameId);
-            if (player1) await Storage.savePlayer(player1);
-            if (player2) await Storage.savePlayer(player2);
+            await Promise.all(participants.map(p => Storage.savePlayer(p)));
         } catch (error) {
             this.games.splice(gameIndex, 0, removedGame);
-            if (player1 && origStats.p1) { player1.gamesPlayed = origStats.p1.gamesPlayed; player1.wins = origStats.p1.wins; }
-            if (player2 && origStats.p2) { player2.gamesPlayed = origStats.p2.gamesPlayed; player2.wins = origStats.p2.wins; }
+            origStats.forEach(o => {
+                const p = PlayerManager.getPlayer(o.id);
+                if (p) { p.gamesPlayed = o.gamesPlayed; p.wins = o.wins; }
+            });
             return { success: false, error: error.message };
         }
         return { success: true };
@@ -308,7 +384,7 @@ const GameManager = {
     getGameHistory(filterPlayerId) {
         let filtered = [...this.games];
         if (filterPlayerId && typeof filterPlayerId === 'string') {
-            filtered = filtered.filter(g => g.player1Id === filterPlayerId || g.player2Id === filterPlayerId);
+            filtered = filtered.filter(g => gameInvolvesPlayer(g, filterPlayerId));
         }
         filtered.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
         return filtered;
@@ -326,11 +402,11 @@ const GameManager = {
 const StatisticsCalculator = {
     calculatePlayerStats(playerId, games) {
         const stats = { gamesPlayed: 0, wins: 0, losses: 0, ties: 0, winPercentage: 0 };
-        const playerGames = games.filter(g => g.player1Id === playerId || g.player2Id === playerId);
+        const playerGames = games.filter(g => gameInvolvesPlayer(g, playerId));
         stats.gamesPlayed = playerGames.length;
         playerGames.forEach(g => {
-            if (g.winnerId === playerId) stats.wins++;
-            else if (g.winnerId === null) stats.ties++;
+            if (didPlayerWin(g, playerId)) stats.wins++;
+            else if (isGameTie(g)) stats.ties++;
             else stats.losses++;
         });
         if (stats.gamesPlayed > 0) {
@@ -441,6 +517,7 @@ const PlayerManagementUI = {
 
 const GameRecordingUI = {
     _bound: false,
+    mode: 'singles',
     initialize() { this.setupEventListeners(); this.render(); },
 
     setupEventListeners() {
@@ -448,9 +525,23 @@ const GameRecordingUI = {
         this._bound = true;
         const form = document.getElementById('record-game-form');
         if (form) form.addEventListener('submit', (e) => { e.preventDefault(); this.handleRecordGame(); });
+        document.querySelectorAll('input[name="game-mode"]').forEach(radio => {
+            radio.addEventListener('change', (e) => this.setMode(e.target.value));
+        });
+    },
+
+    setMode(mode) {
+        this.mode = mode === 'duos' ? 'duos' : 'singles';
+        const singlesEl = document.getElementById('singles-fields');
+        const duosEl = document.getElementById('duos-fields');
+        if (singlesEl) singlesEl.style.display = this.mode === 'singles' ? '' : 'none';
+        if (duosEl) duosEl.style.display = this.mode === 'duos' ? '' : 'none';
+        this.render();
     },
 
     async handleRecordGame() {
+        if (this.mode === 'duos') return this.handleRecordDuosGame();
+
         const p1Select = document.getElementById('player1-select');
         const p2Select = document.getElementById('player2-select');
         const s1Input = document.getElementById('player1-score');
@@ -465,19 +556,59 @@ const GameRecordingUI = {
         }
     },
 
+    async handleRecordDuosGame() {
+        const t1a = document.getElementById('team1-player1-select');
+        const t1b = document.getElementById('team1-player2-select');
+        const t2a = document.getElementById('team2-player1-select');
+        const t2b = document.getElementById('team2-player2-select');
+        const s1Input = document.getElementById('team1-score');
+        const s2Input = document.getElementById('team2-score');
+        const result = await GameManager.recordDuosGame(
+            [t1a.value, t1b.value],
+            [t2a.value, t2b.value],
+            parseInt(s1Input.value, 10),
+            parseInt(s2Input.value, 10)
+        );
+        if (result.success) {
+            this.showFeedback('Duos game recorded!', 'success');
+            [t1a, t1b, t2a, t2b, s1Input, s2Input].forEach(el => { el.value = ''; });
+            PlayerManagementUI.render(); GameHistoryUI.render(); LeaderboardUI.render();
+        } else {
+            this.showFeedback(result.error, 'error');
+        }
+    },
+
     render() {
-        const p1 = document.getElementById('player1-select');
-        const p2 = document.getElementById('player2-select');
-        if (!p1 || !p2) return;
         const players = [...PlayerManager.getAllPlayers()].sort((a, b) => a.name.localeCompare(b.name));
         const opts = players.map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
-        p1.innerHTML = '<option value="">Select Player 1</option>' + opts;
-        p2.innerHTML = '<option value="">Select Player 2</option>' + opts;
+
+        const p1 = document.getElementById('player1-select');
+        const p2 = document.getElementById('player2-select');
+        if (p1 && p2) {
+            p1.innerHTML = '<option value="">Select Player 1</option>' + opts;
+            p2.innerHTML = '<option value="">Select Player 2</option>' + opts;
+            const disabled = players.length < 2;
+            p1.disabled = disabled;
+            p2.disabled = disabled;
+        }
+
+        const duosSelects = [
+            ['team1-player1-select', 'Team 1 - Player 1'],
+            ['team1-player2-select', 'Team 1 - Player 2'],
+            ['team2-player1-select', 'Team 2 - Player 1'],
+            ['team2-player2-select', 'Team 2 - Player 2']
+        ];
+        const duosDisabled = players.length < 4;
+        duosSelects.forEach(([id, label]) => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.innerHTML = `<option value="">${label}</option>` + opts;
+                el.disabled = duosDisabled;
+            }
+        });
+
         const btn = document.querySelector('#record-game-form button[type="submit"]');
-        const disabled = players.length < 2;
-        if (btn) btn.disabled = disabled;
-        p1.disabled = disabled;
-        p2.disabled = disabled;
+        if (btn) btn.disabled = this.mode === 'duos' ? duosDisabled : players.length < 2;
     },
 
     showFeedback(message, type) {
@@ -513,9 +644,19 @@ const GameHistoryUI = {
     async handleDeleteGame(gameId) {
         const game = GameManager.getGameById(gameId);
         if (!game) return;
-        const p1 = PlayerManager.getPlayer(game.player1Id);
-        const p2 = PlayerManager.getPlayer(game.player2Id);
-        if (!confirm(`Delete game: ${p1 ? p1.name : 'Unknown'} vs ${p2 ? p2.name : 'Unknown'}?`)) return;
+        let label;
+        if (isDuosGame(game)) {
+            const names = game.team1.concat(game.team2).map(id => {
+                const p = PlayerManager.getPlayer(id);
+                return p ? p.name : 'Unknown';
+            });
+            label = `${names[0]} & ${names[1]} vs ${names[2]} & ${names[3]}`;
+        } else {
+            const p1 = PlayerManager.getPlayer(game.player1Id);
+            const p2 = PlayerManager.getPlayer(game.player2Id);
+            label = `${p1 ? p1.name : 'Unknown'} vs ${p2 ? p2.name : 'Unknown'}`;
+        }
+        if (!confirm(`Delete game: ${label}?`)) return;
         const result = await GameManager.deleteGame(gameId);
         if (result.success) { this.render(); PlayerManagementUI.render(); LeaderboardUI.render(); }
     },
@@ -546,25 +687,40 @@ const GameHistoryUI = {
         }
 
         container.innerHTML = games.map(game => {
-            const p1 = PlayerManager.getPlayer(game.player1Id);
-            const p2 = PlayerManager.getPlayer(game.player2Id);
-            const p1Name = p1 ? p1.name : 'Unknown';
-            const p2Name = p2 ? p2.name : 'Unknown';
             const ts = this.formatTimestamp(game.timestamp);
-            let resultText;
-            if (game.winnerId === game.player1Id) {
-                resultText = `<span class="player-name winner">${escapeHtml(p1Name)}</span> <span class="score">${game.player1Score}</span> - <span class="player-name">${escapeHtml(p2Name)}</span> <span class="score">${game.player2Score}</span>`;
-            } else if (game.winnerId === game.player2Id) {
-                resultText = `<span class="player-name">${escapeHtml(p1Name)}</span> <span class="score">${game.player1Score}</span> - <span class="player-name winner">${escapeHtml(p2Name)}</span> <span class="score">${game.player2Score}</span>`;
-            } else {
-                resultText = `<span class="player-name">${escapeHtml(p1Name)}</span> <span class="score">${game.player1Score}</span> - <span class="player-name">${escapeHtml(p2Name)}</span> <span class="score">${game.player2Score}</span> <span class="tie-indicator">(Tie)</span>`;
-            }
+            const resultText = isDuosGame(game) ? this.renderDuosResult(game) : this.renderSinglesResult(game);
             return `<div class="game-item" data-game-id="${game.id}"><div class="game-result">${resultText}</div><div class="game-meta"><span class="game-timestamp">${ts}</span><button class="delete-game-btn" data-game-id="${game.id}">Delete</button></div></div>`;
         }).join('');
 
         container.querySelectorAll('.delete-game-btn').forEach(btn => {
             btn.addEventListener('click', () => this.handleDeleteGame(btn.getAttribute('data-game-id')));
         });
+    },
+
+    renderSinglesResult(game) {
+        const p1 = PlayerManager.getPlayer(game.player1Id);
+        const p2 = PlayerManager.getPlayer(game.player2Id);
+        const p1Name = p1 ? p1.name : 'Unknown';
+        const p2Name = p2 ? p2.name : 'Unknown';
+        if (game.winnerId === game.player1Id) {
+            return `<span class="player-name winner">${escapeHtml(p1Name)}</span> <span class="score">${game.player1Score}</span> - <span class="player-name">${escapeHtml(p2Name)}</span> <span class="score">${game.player2Score}</span>`;
+        } else if (game.winnerId === game.player2Id) {
+            return `<span class="player-name">${escapeHtml(p1Name)}</span> <span class="score">${game.player1Score}</span> - <span class="player-name winner">${escapeHtml(p2Name)}</span> <span class="score">${game.player2Score}</span>`;
+        }
+        return `<span class="player-name">${escapeHtml(p1Name)}</span> <span class="score">${game.player1Score}</span> - <span class="player-name">${escapeHtml(p2Name)}</span> <span class="score">${game.player2Score}</span> <span class="tie-indicator">(Tie)</span>`;
+    },
+
+    renderDuosResult(game) {
+        const nameOf = id => {
+            const p = PlayerManager.getPlayer(id);
+            return escapeHtml(p ? p.name : 'Unknown');
+        };
+        const team1Class = game.winningTeam === 1 ? 'team-name winner' : 'team-name';
+        const team2Class = game.winningTeam === 2 ? 'team-name winner' : 'team-name';
+        const team1 = `<span class="${team1Class}">${nameOf(game.team1[0])} &amp; ${nameOf(game.team1[1])}</span>`;
+        const team2 = `<span class="${team2Class}">${nameOf(game.team2[0])} &amp; ${nameOf(game.team2[1])}</span>`;
+        const tie = game.winningTeam === null ? ' <span class="tie-indicator">(Tie)</span>' : '';
+        return `<span class="duos-badge">2v2</span> ${team1} <span class="score">${game.team1Score}</span> - ${team2} <span class="score">${game.team2Score}</span>${tie}`;
     },
 
     formatTimestamp(timestamp) {
@@ -739,7 +895,9 @@ if (typeof window !== 'undefined') {
 }
 
 export {
-    generateUUID, createPlayer, createGame, Storage,
+    generateUUID, createPlayer, createGame, createDuosGame,
+    isDuosGame, getGameParticipants, gameInvolvesPlayer, didPlayerWin, isGameTie,
+    Storage,
     GroupManager, PlayerManager, GameManager, StatisticsCalculator,
     PlayerManagementUI, GameRecordingUI, GameHistoryUI, LeaderboardUI,
     GroupSelectUI, PoolScoreTrackerApp
