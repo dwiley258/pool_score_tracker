@@ -37,7 +37,7 @@ jobs:
       - name: Assemble dist
         run: |
           mkdir -p dist
-          cp index.html app.js styles.css dist/
+          cp index.html app.js styles.css firebase-config.js dist/
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
