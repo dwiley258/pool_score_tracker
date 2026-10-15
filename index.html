@@ -21,14 +21,27 @@
             <header>
                 <h1>Pool Score Tracker</h1>
             </header>
-            <div class="card">
-                <h2>Select or Create a Group</h2>
-                <form id="create-group-form">
-                    <input type="text" id="group-name-input" placeholder="New group name" required>
-                    <button type="submit">Create Group</button>
-                </form>
-                <div id="group-feedback" class="feedback"></div>
-                <div id="group-list"></div>
+            <div class="home-grid">
+                <div class="card">
+                    <h2>Select or Create a Group</h2>
+                    <form id="create-group-form">
+                        <input type="text" id="group-name-input" placeholder="New group name" required>
+                        <button type="submit">Create Group</button>
+                    </form>
+                    <div id="group-feedback" class="feedback"></div>
+                    <div id="group-list"></div>
+                </div>
+
+                <!-- Standalone Tournaments (not tied to any group) -->
+                <div class="card">
+                    <h2>Tournaments</h2>
+                    <p class="card-subtitle">Run a one-off tournament with ad-hoc entrants — no group required.</p>
+                    <form id="create-global-tournament-form">
+                        <input type="text" id="global-tournament-name-input" placeholder="New tournament name" required>
+                        <button type="submit">Create Tournament</button>
+                    </form>
+                    <div id="global-tournament-content"></div>
+                </div>
             </div>
         </section>
 
@@ -156,6 +169,16 @@
                 <section id="leaderboard" class="card">
                     <h2>Leaderboard</h2>
                     <div id="leaderboard-table"></div>
+                </section>
+
+                <!-- Tournament Section -->
+                <section id="tournament" class="card">
+                    <h2>Tournaments</h2>
+                    <form id="create-tournament-form">
+                        <input type="text" id="tournament-name-input" placeholder="New tournament name" required>
+                        <button type="submit">Create Tournament</button>
+                    </form>
+                    <div id="tournament-content"></div>
                 </section>
             </main>
         </div>
